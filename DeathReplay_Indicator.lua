@@ -34,11 +34,26 @@ function DeathReplayIndicator.OnClick()
 end
 
 function DeathReplayIndicator.OnMouseOver()
-    Tooltips.CreateTextOnlyTooltip(SystemData.MouseOverWindow.name, L"Death Replay — click to view captured deaths")
+    Tooltips.CreateTextOnlyTooltip(SystemData.MouseOverWindow.name, L"Death Replay - click to view captured deaths")
+    Tooltips.AnchorTooltip(Tooltips.ANCHOR_WINDOW_RIGHT)
     Tooltips.Finalize()
+end
+
+function DeathReplayIndicator.OnWindowInit()
+    if LayoutEditor and LayoutEditor.RegisterWindow then
+        LayoutEditor.RegisterWindow(
+            "DeathReplay_Indicator",
+            L"Death Replay",
+            L"Unviewed death indicator",
+            true,   -- defaultShown
+            false,  -- resizable
+            false,  -- scalable
+            nil)
+    end
 end
 
 -- Wrap all public entry points in pcall + trace for diagnosis.
 DeathReplayIndicator.Recompute    = dr_safe("Indicator.Recompute",    DeathReplayIndicator.Recompute)
 DeathReplayIndicator.OnClick      = dr_safe("Indicator.OnClick",      DeathReplayIndicator.OnClick)
 DeathReplayIndicator.OnMouseOver  = dr_safe("Indicator.OnMouseOver",  DeathReplayIndicator.OnMouseOver)
+DeathReplayIndicator.OnWindowInit = dr_safe("Indicator.OnWindowInit", DeathReplayIndicator.OnWindowInit)

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Interface xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <Windows>
-        <Window name="DeathReplay_Indicator" inherits="EA_Window_Default" movable="true" layer="popup">
+        <Window name="DeathReplay_Indicator" inherits="EA_Window_Default" movable="true" handleinput="true" savesettings="true" layer="overlay">
             <Size>
                 <AbsPoint x="48" y="48" />
             </Size>
@@ -13,9 +13,10 @@
             <EventHandlers>
                 <EventHandler event="OnLButtonUp" function="DeathReplayIndicator.OnClick" />
                 <EventHandler event="OnMouseOver" function="DeathReplayIndicator.OnMouseOver" />
+                <EventHandler event="OnInitialize" function="DeathReplayIndicator.OnWindowInit" />
             </EventHandlers>
             <Windows>
-                <Window name="$parentBackground" inherits="EA_Window_DefaultFrame" layer="background">
+                <FullResizeImage name="$parentBackground" inherits="EA_FullResizeImage_MetalFill">
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parent">
                             <AbsPoint x="0" y="0"/>
@@ -24,7 +25,7 @@
                             <AbsPoint x="0" y="0"/>
                         </Anchor>
                     </Anchors>
-                </Window>
+                </FullResizeImage>
             </Windows>
         </Window>
     </Windows>

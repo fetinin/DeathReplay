@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ModuleFile xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-    <UiMod name="DeathReplay" version="0.1.0" date="2026-05-15">
+    <UiMod name="DeathReplay" version="0.1.0" date="2026-05-15" autoenabled="true">
         <VersionSettings gameVersion="1.4.8" windowsVersion="1.0" savedVariablesVersion="1.0" />
         <Author name="self" email="" />
         <Description text="Captures the last ~10s of PvP deaths into a browsable timeline." />
@@ -20,9 +20,9 @@
             <SavedVariable name="DeathReplay_SavedVariables" />
         </SavedVariables>
         <OnInitialize>
-            <CallFunction name="DeathReplay.OnInitialize" />
             <CreateWindow name="DeathReplay_Indicator" show="true" />
             <CreateWindow name="DeathReplay_GUI" show="false" />
+            <CallFunction name="DeathReplay.OnInitialize" />
         </OnInitialize>
         <OnShutdown>
             <CallFunction name="DeathReplay.OnShutdown" />
