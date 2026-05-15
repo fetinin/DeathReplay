@@ -32,6 +32,9 @@ local recentEvents          = {}   -- chronological, oldest first; each entry ha
 local lastEffectSnapshot = {}      -- keyed by tostring(buffId) .. "|" .. tostring(casterId)
 local effectsBaseline = false      -- true once we've seeded from GetBuffs after LOADING_END
 
+local deathState  = "alive"      -- "alive" | "dead"
+local captureDone = false        -- prevents double-capture on HP=0 re-fires
+
 local function isRvrZone(zoneId)
     return RVR_ZONES[zoneId] == true
 end
@@ -142,6 +145,19 @@ function DeathReplay.OnEffectsUpdated(changedEffects, isFullList)
     lastEffectSnapshot = current
 end
 
+function DeathReplay.OnHitPointsUpdated()
+    if not isPvpNow then return end
+    local hp = GameData.Player.hitPoints and GameData.Player.hitPoints.current or 0
+    if deathState == "alive" and hp == 0 and not captureDone then
+        EA_ChatWindow.Print(L"[stub] DeathReplay: would capture death here")
+        captureDone = true
+        deathState  = "dead"
+    elseif deathState == "dead" and hp > 0 then
+        deathState  = "alive"
+        captureDone = false
+    end
+end
+
 function DeathReplay.OnInitialize()
     if DeathReplay_SavedVariables == nil then
         DeathReplay_SavedVariables = defaultSavedVariables()
@@ -159,6 +175,8 @@ function DeathReplay.OnInitialize()
 
     RegisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
 
+    RegisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
+
     EA_ChatWindow.Print(L"DeathReplay v0.1.0 loaded.")
 end
 
@@ -170,6 +188,8 @@ function DeathReplay.OnShutdown()
     UnregisterEventHandler(SystemData.Events.WORLD_OBJ_COMBAT_EVENT, "DeathReplay.OnCombatEvent")
 
     UnregisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
+
+    UnregisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
 end
 
 function DeathReplay.OnUpdate(elapsed)
