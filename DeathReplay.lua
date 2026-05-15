@@ -35,6 +35,76 @@ local effectsBaseline = false      -- true once we've seeded from GetBuffs after
 local deathState  = "alive"      -- "alive" | "dead"
 local captureDone = false        -- prevents double-capture on HP=0 re-fires
 
+local function fixZoneName(name)
+    -- Quick wstring trim — same pattern as QueueQueuer.FixName. Strip trailing junk control chars.
+    if name == nil then return L"" end
+    local s = tostring(name)
+    -- Drop everything from a ^ if present (game appends ^M / ^F sometimes)
+    local i = string.find(s, "^", 1, true)
+    if i then s = string.sub(s, 1, i - 1) end
+    return towstring(s)
+end
+
+local function captureDeath()
+    local deathTime = GetComputerTime() / 1000
+    local events = {}
+    local killingBlow = nil
+    for _, e in ipairs(recentEvents) do
+        local entry = {
+            dt   = e.t - deathTime,         -- negative number, seconds before death
+            kind = e.kind,
+        }
+        if e.kind == "HIT" then
+            entry.ability   = e.ability
+            entry.abilityId = e.abilityId
+            entry.amount    = e.amount
+            entry.crit      = e.crit
+            -- Last HIT event wins as killing blow.
+            killingBlow = {
+                kind      = (e.crit and "ABILITY_CRITICAL" or "ABILITY_HIT"),
+                ability   = e.ability,
+                abilityId = e.abilityId,
+                amount    = e.amount,
+            }
+            entry.killingBlow = true       -- will be cleared below for non-final HITs
+        elseif e.kind == "BUFF_GAIN" or e.kind == "BUFF_LOSS" then
+            entry.name     = e.name
+            entry.buffId   = e.buffId
+            entry.duration = e.duration
+        end
+        table.insert(events, entry)
+    end
+    -- Only the final HIT keeps killingBlow=true. Walk backwards, clear it from all but the last.
+    local seenKillingBlow = false
+    for i = #events, 1, -1 do
+        if events[i].killingBlow then
+            if seenKillingBlow then
+                events[i].killingBlow = nil
+            else
+                seenKillingBlow = true
+            end
+        end
+    end
+
+    local death = {
+        timestamp   = deathTime,
+        zone        = fixZoneName(GetZoneName(GameData.Player.zone)),
+        zoneId      = GameData.Player.zone,
+        context     = (GameData.Player.isInScenario and "scenario" or "rvr"),
+        viewed      = false,
+        killingBlow = killingBlow,
+        events      = events,
+    }
+
+    -- Prepend, FIFO trim to maxDeathsStored
+    table.insert(DeathReplay_SavedVariables.deaths, 1, death)
+    while #DeathReplay_SavedVariables.deaths > DeathReplay_SavedVariables.config.maxDeathsStored do
+        table.remove(DeathReplay_SavedVariables.deaths)
+    end
+
+    EA_ChatWindow.Print(L"DeathReplay: capture saved. /dr to view.")
+end
+
 local function isRvrZone(zoneId)
     return RVR_ZONES[zoneId] == true
 end
@@ -149,7 +219,7 @@ function DeathReplay.OnHitPointsUpdated()
     if not isPvpNow then return end
     local hp = GameData.Player.hitPoints and GameData.Player.hitPoints.current or 0
     if deathState == "alive" and hp == 0 and not captureDone then
-        EA_ChatWindow.Print(L"[stub] DeathReplay: would capture death here")
+        captureDeath()
         captureDone = true
         deathState  = "dead"
     elseif deathState == "dead" and hp > 0 then
