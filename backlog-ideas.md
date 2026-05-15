@@ -73,3 +73,10 @@ Each entry: **what**, **why deferred from v1**, **rough work needed**.
 ## 12. Death context detail: "configurable capture mode" beyond hardcoded PvP-only
 - **Why deferred:** Brainstorming step 3's third option ("configurable via slash command") was not chosen; PvP-only was chosen. Config field `captureMode` already lives in SavedVariables shape for future use.
 - **Work needed:** Wire `/dr capture pvp|all|scenario` to flip the flag; `inPvpContext()` honors it.
+
+## 13. Indicator: bring back amber/gray tint instead of show/hide
+- **Why deferred:** v1 initial Indicator XML used `<Texture texture="EA_Icons" textureSlice="...">` inside a nested `<Windows>` block, which is non-standard WAR XML and triggered the game's "Errors detected!" load warning. Fixup `41692d8` deleted the inner Window+Texture entirely and replaced `WindowSetTintColor` with `WindowSetShowing` — widget now hides when there are no unviewed deaths, shows (default skin border, no icon inside) when there are.
+- **Work needed:**
+  - Inside the Indicator window, add a `<DynamicImage>` child following the PotionBar pattern (`Interface/AddOns/PotionBar/source/Floating.xml` line uses `texture="shared_01" slice="Radio-Button"` for a tintable background; `<DynamicImage name="$parentIcon" textureScale="0.719" handleinput="false">` for an icon placeholder that gets a texture set via `DynamicImageSetTexture(name, texture, x, y)` from Lua).
+  - Restore `LIT_COLOR` / `DIM_COLOR` constants and `WindowSetTintColor` call in `DeathReplayIndicator.Recompute()`, targeting the new DynamicImage's resolved name.
+  - Keep `WindowSetShowing` if you want the widget to also fully hide when dim — or just rely on the tint alone (matches the original v1 design intent more closely).
