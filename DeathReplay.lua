@@ -9,6 +9,19 @@ DeathReplay_SavedVariables = nil   -- engine populates from disk on load, or lea
 
 local SCHEMA_VERSION = 1
 
+-- Diagnostic helper: wrap entry points in pcall + trace for silent error detection.
+local function dr_safe(fn_name, fn, noisy)
+    return function(...)
+        if noisy ~= false then
+            EA_ChatWindow.Print(L"DR_TRACE " .. towstring(fn_name))
+        end
+        local ok, err = pcall(fn, ...)
+        if not ok then
+            EA_ChatWindow.Print(L"DR_ERR " .. towstring(fn_name) .. L": " .. towstring(tostring(err)))
+        end
+    end
+end
+
 -- Open-RvR campaign zone ids. Copied from QueueQueuer.lua:280-302 (CampaignZones).
 local RVR_ZONES = {
     [9]   = true,  [5]   = true,  [3]   = true,  [4]   = true,  [10]  = true,
@@ -290,3 +303,10 @@ function DeathReplay.HandleSlash(input)
         EA_ChatWindow.Print(L"DeathReplay: GUI not loaded. Try /reloadui.")
     end
 end
+
+-- Wrap all public entry points in pcall + trace for diagnosis.
+DeathReplay.HandleSlash             = dr_safe("HandleSlash",             DeathReplay.HandleSlash,             true)
+DeathReplay.OnCombatEvent           = dr_safe("OnCombatEvent",           DeathReplay.OnCombatEvent,           false)
+DeathReplay.OnEffectsUpdated        = dr_safe("OnEffectsUpdated",        DeathReplay.OnEffectsUpdated,        false)
+DeathReplay.OnHitPointsUpdated      = dr_safe("OnHitPointsUpdated",      DeathReplay.OnHitPointsUpdated,      false)
+DeathReplay.OnContextMaybeChanged   = dr_safe("OnContextMaybeChanged",   DeathReplay.OnContextMaybeChanged,   true)

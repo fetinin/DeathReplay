@@ -2,6 +2,17 @@
 
 DeathReplayIndicator = {}
 
+-- Diagnostic helper: wrap entry points in pcall + trace for silent error detection.
+local function dr_safe(fn_name, fn)
+    return function(...)
+        EA_ChatWindow.Print(L"DR_TRACE " .. towstring(fn_name))
+        local ok, err = pcall(fn, ...)
+        if not ok then
+            EA_ChatWindow.Print(L"DR_ERR " .. towstring(fn_name) .. L": " .. towstring(tostring(err)))
+        end
+    end
+end
+
 
 function DeathReplayIndicator.Recompute()
     local anyUnviewed = false
@@ -26,3 +37,8 @@ function DeathReplayIndicator.OnMouseOver()
     Tooltips.CreateTextOnlyTooltip(SystemData.MouseOverWindow.name, L"Death Replay — click to view captured deaths")
     Tooltips.Finalize()
 end
+
+-- Wrap all public entry points in pcall + trace for diagnosis.
+DeathReplayIndicator.Recompute    = dr_safe("Indicator.Recompute",    DeathReplayIndicator.Recompute)
+DeathReplayIndicator.OnClick      = dr_safe("Indicator.OnClick",      DeathReplayIndicator.OnClick)
+DeathReplayIndicator.OnMouseOver  = dr_safe("Indicator.OnMouseOver",  DeathReplayIndicator.OnMouseOver)

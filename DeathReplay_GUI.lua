@@ -2,6 +2,17 @@
 
 DeathReplay_GUI = {}
 
+-- Diagnostic helper: wrap entry points in pcall + trace for silent error detection.
+local function dr_safe(fn_name, fn)
+    return function(...)
+        EA_ChatWindow.Print(L"DR_TRACE " .. towstring(fn_name))
+        local ok, err = pcall(fn, ...)
+        if not ok then
+            EA_ChatWindow.Print(L"DR_ERR " .. towstring(fn_name) .. L": " .. towstring(tostring(err)))
+        end
+    end
+end
+
 local state = {
     visible      = false,
     currentIndex = 1,
@@ -123,3 +134,14 @@ end
 function DeathReplay_GUI.OnClose()
     DeathReplay_GUI.Hide()
 end
+
+-- Wrap all public entry points in pcall + trace for diagnosis.
+DeathReplay_GUI.Show          = dr_safe("Show",          DeathReplay_GUI.Show)
+DeathReplay_GUI.Hide          = dr_safe("Hide",          DeathReplay_GUI.Hide)
+DeathReplay_GUI.Toggle        = dr_safe("Toggle",        DeathReplay_GUI.Toggle)
+DeathReplay_GUI.Render        = dr_safe("Render",        DeathReplay_GUI.Render)
+DeathReplay_GUI.OnPrev        = dr_safe("OnPrev",        DeathReplay_GUI.OnPrev)
+DeathReplay_GUI.OnNext        = dr_safe("OnNext",        DeathReplay_GUI.OnNext)
+DeathReplay_GUI.OnToggleDmg   = dr_safe("OnToggleDmg",   DeathReplay_GUI.OnToggleDmg)
+DeathReplay_GUI.OnToggleBuffs = dr_safe("OnToggleBuffs", DeathReplay_GUI.OnToggleBuffs)
+DeathReplay_GUI.OnClose       = dr_safe("OnClose",       DeathReplay_GUI.OnClose)
