@@ -211,12 +211,13 @@ function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
     if not isDefenderPlayer(objectID) then return end
     local mapping = COMBAT_EVENT_KIND[combatEvent]
     if mapping == nil then return end       -- v1 ignores misses and unknowns
-    if amount == nil or amount <= 0 then return end
+    if amount == nil or amount == 0 then return end
+    local positive_amount = (amount < 0) and -amount or amount
     local abilityName = GetAbilityName(abilityID)
     pushEvent({
         kind      = mapping.kind,
         crit      = mapping.crit,
-        amount    = amount,
+        amount    = positive_amount,
         abilityId = abilityID,
         ability   = abilityName,    -- may be empty wstring if unresolvable
     })
