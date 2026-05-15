@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "DeathReplay",
+  "project_id": "8df60b35-38fb-4774-8fd4-266613f564ae"
+}
