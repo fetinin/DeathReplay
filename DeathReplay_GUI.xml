@@ -39,7 +39,6 @@
                 </Label>
 
                 <Button name="$parentPrev" inherits="EA_Button_DefaultResizeable" layer="popup">
-                    <Size><AbsPoint x="32" y="24" /></Size>
                     <Anchors>
                         <Anchor point="topright" relativeTo="$parentNavLabel" relativePoint="topleft">
                             <AbsPoint x="-8" y="0" />
@@ -51,7 +50,6 @@
                 </Button>
 
                 <Button name="$parentNext" inherits="EA_Button_DefaultResizeable" layer="popup">
-                    <Size><AbsPoint x="32" y="24" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativeTo="$parentNavLabel" relativePoint="topright">
                             <AbsPoint x="8" y="0" />
@@ -94,7 +92,6 @@
                 </Label>
 
                 <Button name="$parentClose" inherits="EA_Button_DefaultResizeable" layer="popup">
-                    <Size><AbsPoint x="32" y="24" /></Size>
                     <Anchors>
                         <Anchor point="topright" relativeTo="$parent" relativePoint="topright">
                             <AbsPoint x="-8" y="8" />

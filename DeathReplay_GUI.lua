@@ -62,9 +62,13 @@ end
 
 function DeathReplay_GUI.Render()
     local list = deaths()
+    EA_ChatWindow.Print(L"DR_DEBUG Render: deaths=" .. towstring(#list))
     if #list == 0 then
+        EA_ChatWindow.Print(L"DR_DEBUG empty state - setting Title to 'DeathReplay'")
         LabelSetText("DeathReplay_GUITitle", L"DeathReplay")
+        EA_ChatWindow.Print(L"DR_DEBUG empty state - setting NavLabel to ''")
         LabelSetText("DeathReplay_GUINavLabel", L"")
+        EA_ChatWindow.Print(L"DR_DEBUG empty state - setting Timeline placeholder")
         LabelSetText("DeathReplay_GUITimeline",
             L"No deaths captured yet. Die in a scenario or RvR zone to capture your first replay.")
         return
@@ -73,11 +77,18 @@ function DeathReplay_GUI.Render()
     if state.currentIndex > #list then state.currentIndex = #list end
     local d = list[state.currentIndex]
     local kbName = (d.killingBlow and d.killingBlow.ability) or L"unknown"
-    LabelSetText("DeathReplay_GUITitle",
-        L"DeathReplay   " .. towstring(state.currentIndex) .. L"/" .. towstring(#list))
-    LabelSetText("DeathReplay_GUINavLabel",
-        (d.zone or L"?") .. L"  —  killed by " .. kbName)
-    LabelSetText("DeathReplay_GUITimeline", renderTimeline(d))
+
+    local titleText = L"DeathReplay   " .. towstring(state.currentIndex) .. L"/" .. towstring(#list)
+    EA_ChatWindow.Print(L"DR_DEBUG LabelSetText DeathReplay_GUITitle = " .. titleText)
+    LabelSetText("DeathReplay_GUITitle", titleText)
+
+    local navText = (d.zone or L"?") .. L"  —  killed by " .. kbName
+    EA_ChatWindow.Print(L"DR_DEBUG LabelSetText DeathReplay_GUINavLabel = " .. navText)
+    LabelSetText("DeathReplay_GUINavLabel", navText)
+
+    local timelineText = renderTimeline(d)
+    EA_ChatWindow.Print(L"DR_DEBUG LabelSetText DeathReplay_GUITimeline length=" .. towstring(wstring.len(timelineText)))
+    LabelSetText("DeathReplay_GUITimeline", timelineText)
 
     -- Mark this death viewed.
     if d.viewed == false then
@@ -94,6 +105,7 @@ end
 function DeathReplay_GUI.Show()
     state.visible = true
     WindowSetShowing("DeathReplay_GUI", true)
+    EA_ChatWindow.Print(L"DR_DEBUG calling ButtonSetText on 5 buttons (Prev/Next/FilterDmg/FilterBuffs/Close)")
     ButtonSetText("DeathReplay_GUIPrev",        L"<")
     ButtonSetText("DeathReplay_GUINext",        L">")
     ButtonSetText("DeathReplay_GUIFilterDmg",   L"damage")
