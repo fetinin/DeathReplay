@@ -1,3 +1,7 @@
+-- Self-id assumption (not yet empirically verified): for WORLD_OBJ_COMBAT_EVENT,
+-- defender objectID equals GameData.Player.worldObjNum. Probe deferred to
+-- end-of-batch in-game verification. If wrong, replace via fixup commit.
+
 -- DeathReplay v0.1.0 — skeleton, see docs/superpowers/specs/2026-05-15-death-replay-design.md
 
 DeathReplay = {}
@@ -24,6 +28,10 @@ local function recomputePvpContext()
     isPvpNow = (GameData.Player.isInScenario == true)
                or isRvrZone(GameData.Player.zone)
     return prev, isPvpNow
+end
+
+local function isDefenderPlayer(objectID)
+    return objectID == GameData.Player.worldObjNum
 end
 
 function DeathReplay.OnContextMaybeChanged()
