@@ -14,20 +14,6 @@
                 <EventHandler event="OnLButtonUp" function="DeathReplayIndicator.OnClick" />
                 <EventHandler event="OnMouseOver" function="DeathReplayIndicator.OnMouseOver" />
             </EventHandlers>
-            <Windows>
-                <Window name="$parentIcon">
-                    <Size><AbsPoint x="32" y="32" /></Size>
-                    <Anchors>
-                        <Anchor point="center" relativeTo="$parent" relativePoint="center"/>
-                    </Anchors>
-                    <Textures>
-                        <Texture name="$parentIconTex" texture="EA_Icons" textureSlice="ABILITY_LIVING_BOMB">
-                            <Anchors><Anchor point="topleft" relativeTo="$parent" relativePoint="topleft"/></Anchors>
-                            <Size><AbsPoint x="32" y="32" /></Size>
-                        </Texture>
-                    </Textures>
-                </Window>
-            </Windows>
         </Window>
     </Windows>
 </Interface>

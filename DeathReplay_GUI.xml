@@ -71,7 +71,7 @@
                     </EventHandlers>
                 </Button>
 
-                <Label name="$parentTimeline" font="font_chat_text" multiline="true">
+                <Label name="$parentTimeline" font="font_chat_text" wordwrap="true">
                     <Size><AbsPoint x="440" y="290" /></Size>
                     <Anchors>
                         <Anchor point="top" relativeTo="$parentFilterDmg" relativePoint="bottom">

@@ -2,17 +2,15 @@
 
 DeathReplayIndicator = {}
 
-local LIT_COLOR = { r = 255, g = 200, b = 80  }    -- bright amber
-local DIM_COLOR = { r = 110, g = 110, b = 110 }    -- gray
 
 function DeathReplayIndicator.Recompute()
     local anyUnviewed = false
     for _, d in ipairs(DeathReplay_SavedVariables.deaths) do
         if d.viewed == false then anyUnviewed = true; break end
     end
-    local c = anyUnviewed and LIT_COLOR or DIM_COLOR
-    -- WindowSetTintColor takes (window, r, g, b). If the texture API differs slightly, see Aura/wsct examples.
-    WindowSetTintColor("DeathReplay_IndicatorIconIconTex", c.r, c.g, c.b)
+    -- v1 simplification: show the widget only when there are unviewed deaths.
+    -- v2 backlog: bring back amber/gray tinting via proper DynamicImage icon.
+    WindowSetShowing("DeathReplay_Indicator", anyUnviewed)
 end
 
 function DeathReplayIndicator.OnClick()
