@@ -82,7 +82,7 @@ function DeathReplay_GUI.Render()
     EA_ChatWindow.Print(L"DR_DEBUG LabelSetText DeathReplay_GUITitle = " .. titleText)
     LabelSetText("DeathReplay_GUITitle", titleText)
 
-    local navText = (d.zone or L"?") .. L"  —  killed by " .. kbName
+    local navText = (d.zone or L"?") .. L"  -  killed by " .. kbName
     EA_ChatWindow.Print(L"DR_DEBUG LabelSetText DeathReplay_GUINavLabel = " .. navText)
     LabelSetText("DeathReplay_GUINavLabel", navText)
 

@@ -32,6 +32,8 @@ local RVR_ZONES = {
 
 local isPvpNow = false   -- cached; updated by DeathReplay.OnContextMaybeChanged
 
+local probe_hits_seen = 0
+
 local BUFFER_WINDOW_S       = 10
 local MAX_EVENTS_BUFFERED   = 500
 local COMBAT_EVENT_KIND = {
@@ -192,6 +194,19 @@ end
 
 function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
     if not isPvpNow then return end
+
+    -- Temporary probe (delete after empirical verification)
+    if probe_hits_seen < 5 then
+        probe_hits_seen = probe_hits_seen + 1
+        EA_ChatWindow.Print(L"DR_PROBE hit#" .. towstring(probe_hits_seen)
+            .. L" objectID=" .. towstring(objectID)
+            .. L" worldObjNum=" .. towstring(GameData.Player.worldObjNum or 0)
+            .. L" objectID(field)=" .. towstring(GameData.Player.objectID or 0)
+            .. L" id=" .. towstring(GameData.Player.id or 0)
+            .. L" entityId=" .. towstring(GameData.Player.entityId or 0)
+            .. L" amount=" .. towstring(amount))
+    end
+
     if not isDefenderPlayer(objectID) then return end
     local mapping = COMBAT_EVENT_KIND[combatEvent]
     if mapping == nil then return end       -- v1 ignores misses and unknowns

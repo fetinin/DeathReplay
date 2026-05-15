@@ -23,7 +23,7 @@
                 <Label name="$parentTitle" font="font_default_large" inherits="DefaultWindowText" handleinput="false" textalign="center" wordwrap="false">
                     <Size><AbsPoint x="440" y="24" /></Size>
                     <Anchors>
-                        <Anchor point="top" relativeTo="$parent" relativePoint="top">
+                        <Anchor point="top" relativeTo="$parentBackground" relativePoint="top">
                             <AbsPoint x="0" y="12" />
                         </Anchor>
                     </Anchors>
@@ -93,7 +93,7 @@
 
                 <Button name="$parentClose" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Anchors>
-                        <Anchor point="topright" relativeTo="$parent" relativePoint="topright">
+                        <Anchor point="topright" relativeTo="$parentBackground" relativePoint="topright">
                             <AbsPoint x="-8" y="8" />
                         </Anchor>
                     </Anchors>
