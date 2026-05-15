@@ -12,7 +12,7 @@ function DeathReplayIndicator.Recompute()
     end
     local c = anyUnviewed and LIT_COLOR or DIM_COLOR
     -- WindowSetTintColor takes (window, r, g, b). If the texture API differs slightly, see Aura/wsct examples.
-    WindowSetTintColor("DeathReplay_IndicatorIconTex", c.r, c.g, c.b)
+    WindowSetTintColor("DeathReplay_IndicatorIconIconTex", c.r, c.g, c.b)
 end
 
 function DeathReplayIndicator.OnClick()
