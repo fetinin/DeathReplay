@@ -32,7 +32,6 @@
                             <AbsPoint x="-8" y="0" />
                         </Anchor>
                     </Anchors>
-                    <Text>&lt;</Text>
                     <EventHandlers>
                         <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnPrev"/>
                     </EventHandlers>
@@ -45,7 +44,6 @@
                             <AbsPoint x="8" y="0" />
                         </Anchor>
                     </Anchors>
-                    <Text>&gt;</Text>
                     <EventHandlers>
                         <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnNext"/>
                     </EventHandlers>
@@ -57,7 +55,6 @@
                             <AbsPoint x="-60" y="14" />
                         </Anchor>
                     </Anchors>
-                    <Text>damage</Text>
                     <EventHandlers>
                         <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnToggleDmg"/>
                     </EventHandlers>
@@ -69,7 +66,6 @@
                             <AbsPoint x="60" y="14" />
                         </Anchor>
                     </Anchors>
-                    <Text>buffs</Text>
                     <EventHandlers>
                         <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnToggleBuffs"/>
                     </EventHandlers>
@@ -91,7 +87,6 @@
                             <AbsPoint x="-8" y="8" />
                         </Anchor>
                     </Anchors>
-                    <Text>X</Text>
                     <EventHandlers>
                         <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnClose"/>
                     </EventHandlers>

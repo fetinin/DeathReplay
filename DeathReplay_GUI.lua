@@ -83,6 +83,11 @@ end
 function DeathReplay_GUI.Show()
     state.visible = true
     WindowSetShowing("DeathReplay_GUI", true)
+    ButtonSetText("DeathReplay_GUIPrev",        L"<")
+    ButtonSetText("DeathReplay_GUINext",        L">")
+    ButtonSetText("DeathReplay_GUIFilterDmg",   L"damage")
+    ButtonSetText("DeathReplay_GUIFilterBuffs", L"buffs")
+    ButtonSetText("DeathReplay_GUIClose",       L"X")
     DeathReplay_GUI.Render()
 end
 
