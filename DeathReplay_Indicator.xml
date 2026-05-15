@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Interface xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <Windows>
-        <Window name="DeathReplay_Indicator" inherits="EA_DefaultWindowSkin" movable="true">
+        <Window name="DeathReplay_Indicator" inherits="EA_Window_Default" movable="true" layer="popup">
             <Size>
                 <AbsPoint x="48" y="48" />
             </Size>
