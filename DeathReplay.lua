@@ -19,6 +19,16 @@ local RVR_ZONES = {
 
 local isPvpNow = false   -- cached; updated by DeathReplay.OnContextMaybeChanged
 
+local BUFFER_WINDOW_S       = 10
+local MAX_EVENTS_BUFFERED   = 500
+local COMBAT_EVENT_KIND = {
+    [GameData.CombatEvent.HIT]               = { kind = "HIT", crit = false },
+    [GameData.CombatEvent.ABILITY_HIT]       = { kind = "HIT", crit = false },
+    [GameData.CombatEvent.CRITICAL]          = { kind = "HIT", crit = true  },
+    [GameData.CombatEvent.ABILITY_CRITICAL]  = { kind = "HIT", crit = true  },
+}
+local recentEvents          = {}   -- chronological, oldest first; each entry has .t (GetComputerTime) + kind + payload
+
 local function isRvrZone(zoneId)
     return RVR_ZONES[zoneId] == true
 end
@@ -50,6 +60,43 @@ local function defaultSavedVariables()
     }
 end
 
+local trimAccumulator = 0
+local TRIM_INTERVAL_S = 0.5
+
+local function trimRecentEvents()
+    if #recentEvents == 0 then return end
+    local now = GetComputerTime() / 1000   -- GetComputerTime returns ms; convert to seconds
+    local cutoff = now - BUFFER_WINDOW_S
+    -- Drop from the front until oldest entry is within the window.
+    while #recentEvents > 0 and recentEvents[1].t < cutoff do
+        table.remove(recentEvents, 1)
+    end
+end
+
+local function pushEvent(entry)
+    entry.t = GetComputerTime() / 1000
+    if #recentEvents >= MAX_EVENTS_BUFFERED then
+        table.remove(recentEvents, 1)   -- drop oldest to make room
+    end
+    table.insert(recentEvents, entry)
+end
+
+function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
+    if not isPvpNow then return end
+    if not isDefenderPlayer(objectID) then return end
+    local mapping = COMBAT_EVENT_KIND[combatEvent]
+    if mapping == nil then return end       -- v1 ignores misses and unknowns
+    if amount == nil or amount <= 0 then return end
+    local abilityName = GetAbilityName(abilityID)
+    pushEvent({
+        kind      = mapping.kind,
+        crit      = mapping.crit,
+        amount    = amount,
+        abilityId = abilityID,
+        ability   = abilityName,    -- may be empty wstring if unresolvable
+    })
+end
+
 function DeathReplay.OnInitialize()
     if DeathReplay_SavedVariables == nil then
         DeathReplay_SavedVariables = defaultSavedVariables()
@@ -63,6 +110,8 @@ function DeathReplay.OnInitialize()
     RegisterEventHandler(SystemData.Events.PLAYER_AREA_NAME_CHANGED,   "DeathReplay.OnContextMaybeChanged")
     RegisterEventHandler(SystemData.Events.SCENARIO_INSTANCE_JOIN_NOW, "DeathReplay.OnContextMaybeChanged")
 
+    RegisterEventHandler(SystemData.Events.WORLD_OBJ_COMBAT_EVENT, "DeathReplay.OnCombatEvent")
+
     EA_ChatWindow.Print(L"DeathReplay v0.1.0 loaded.")
 end
 
@@ -70,10 +119,15 @@ function DeathReplay.OnShutdown()
     UnregisterEventHandler(SystemData.Events.LOADING_END,                "DeathReplay.OnContextMaybeChanged")
     UnregisterEventHandler(SystemData.Events.PLAYER_AREA_NAME_CHANGED,   "DeathReplay.OnContextMaybeChanged")
     UnregisterEventHandler(SystemData.Events.SCENARIO_INSTANCE_JOIN_NOW, "DeathReplay.OnContextMaybeChanged")
+
+    UnregisterEventHandler(SystemData.Events.WORLD_OBJ_COMBAT_EVENT, "DeathReplay.OnCombatEvent")
 end
 
 function DeathReplay.OnUpdate(elapsed)
-    -- Ring buffer trim added in task 4.
+    trimAccumulator = trimAccumulator + elapsed
+    if trimAccumulator < TRIM_INTERVAL_S then return end
+    trimAccumulator = 0
+    trimRecentEvents()
 end
 
 function DeathReplay.HandleSlash(input)
