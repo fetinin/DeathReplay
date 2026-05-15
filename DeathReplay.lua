@@ -5,6 +5,31 @@ DeathReplay_SavedVariables = nil   -- engine populates from disk on load, or lea
 
 local SCHEMA_VERSION = 1
 
+-- Open-RvR campaign zone ids. Copied from QueueQueuer.lua:280-302 (CampaignZones).
+local RVR_ZONES = {
+    [9]   = true,  [5]   = true,  [3]   = true,  [4]   = true,  [10]  = true,
+    [103] = true,  [105] = true,  [109] = true,  [104] = true,  [110] = true,
+    [161] = true,  [162] = true,
+    [203] = true,  [205] = true,  [209] = true,  [204] = true,  [210] = true,
+}
+
+local isPvpNow = false   -- cached; updated by DeathReplay.OnContextMaybeChanged
+
+local function isRvrZone(zoneId)
+    return RVR_ZONES[zoneId] == true
+end
+
+local function recomputePvpContext()
+    local prev = isPvpNow
+    isPvpNow = (GameData.Player.isInScenario == true)
+               or isRvrZone(GameData.Player.zone)
+    return prev, isPvpNow
+end
+
+function DeathReplay.OnContextMaybeChanged()
+    recomputePvpContext()
+end
+
 local function defaultSavedVariables()
     return {
         version = SCHEMA_VERSION,
@@ -25,11 +50,18 @@ function DeathReplay.OnInitialize()
     -- No migrations exist yet (we are v1).
 
     LibSlash.RegisterSlashCmd("dr", function(input) DeathReplay.HandleSlash(input) end)
+
+    RegisterEventHandler(SystemData.Events.LOADING_END,                "DeathReplay.OnContextMaybeChanged")
+    RegisterEventHandler(SystemData.Events.PLAYER_AREA_NAME_CHANGED,   "DeathReplay.OnContextMaybeChanged")
+    RegisterEventHandler(SystemData.Events.SCENARIO_INSTANCE_JOIN_NOW, "DeathReplay.OnContextMaybeChanged")
+
     EA_ChatWindow.Print(L"DeathReplay v0.1.0 loaded.")
 end
 
 function DeathReplay.OnShutdown()
-    -- Nothing to unregister yet; handlers added in later tasks.
+    UnregisterEventHandler(SystemData.Events.LOADING_END,                "DeathReplay.OnContextMaybeChanged")
+    UnregisterEventHandler(SystemData.Events.PLAYER_AREA_NAME_CHANGED,   "DeathReplay.OnContextMaybeChanged")
+    UnregisterEventHandler(SystemData.Events.SCENARIO_INSTANCE_JOIN_NOW, "DeathReplay.OnContextMaybeChanged")
 end
 
 function DeathReplay.OnUpdate(elapsed)
