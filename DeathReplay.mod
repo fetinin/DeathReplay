@@ -11,12 +11,15 @@
         </Dependencies>
         <Files>
             <File name="DeathReplay.lua" />
+            <File name="DeathReplay_Indicator.xml" />
+            <File name="DeathReplay_Indicator.lua" />
         </Files>
         <SavedVariables>
             <SavedVariable name="DeathReplay_SavedVariables" />
         </SavedVariables>
         <OnInitialize>
             <CallFunction name="DeathReplay.OnInitialize" />
+            <CreateWindow name="DeathReplay_Indicator" show="true" />
         </OnInitialize>
         <OnShutdown>
             <CallFunction name="DeathReplay.OnShutdown" />

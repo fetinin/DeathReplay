@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Interface xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <Windows>
+        <Window name="DeathReplay_Indicator" inherits="EA_DefaultWindowSkin" movable="true">
+            <Size>
+                <AbsPoint x="48" y="48" />
+            </Size>
+            <Anchors>
+                <Anchor point="topleft" relativeTo="Root" relativePoint="topleft">
+                    <AbsPoint x="200" y="200" />
+                </Anchor>
+            </Anchors>
+            <EventHandlers>
+                <EventHandler event="OnLButtonUp" function="DeathReplayIndicator.OnClick" />
+                <EventHandler event="OnMouseOver" function="DeathReplayIndicator.OnMouseOver" />
+            </EventHandlers>
+            <Windows>
+                <Window name="$parentIcon">
+                    <Size><AbsPoint x="32" y="32" /></Size>
+                    <Anchors>
+                        <Anchor point="center" relativeTo="$parent" relativePoint="center"/>
+                    </Anchors>
+                    <Textures>
+                        <Texture name="$parentIconTex" texture="EA_Icons" textureSlice="ABILITY_LIVING_BOMB">
+                            <Anchors><Anchor point="topleft" relativeTo="$parent" relativePoint="topleft"/></Anchors>
+                            <Size><AbsPoint x="32" y="32" /></Size>
+                        </Texture>
+                    </Textures>
+                </Window>
+            </Windows>
+        </Window>
+    </Windows>
+</Interface>

@@ -102,6 +102,10 @@ local function captureDeath()
         table.remove(DeathReplay_SavedVariables.deaths)
     end
 
+    if DeathReplayIndicator and DeathReplayIndicator.Recompute then
+        DeathReplayIndicator.Recompute()
+    end
+
     EA_ChatWindow.Print(L"DeathReplay: capture saved. /dr to view.")
 end
 
@@ -248,6 +252,10 @@ function DeathReplay.OnInitialize()
     RegisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
 
     EA_ChatWindow.Print(L"DeathReplay v0.1.0 loaded.")
+
+    if DeathReplayIndicator and DeathReplayIndicator.Recompute then
+        DeathReplayIndicator.Recompute()
+    end
 end
 
 function DeathReplay.OnShutdown()
