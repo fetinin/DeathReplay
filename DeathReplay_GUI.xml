@@ -32,16 +32,16 @@
                 <Label name="$parentNavLabel" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="false">
                     <Size><AbsPoint x="440" y="20" /></Size>
                     <Anchors>
-                        <Anchor point="topleft" relativePoint="bottomleft" relativeTo="$parentTitle">
-                            <AbsPoint x="0" y="6" />
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="20" y="44" />
                         </Anchor>
                     </Anchors>
                 </Label>
 
                 <Button name="$parentPrev" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Anchors>
-                        <Anchor point="topleft" relativePoint="bottomleft" relativeTo="$parentNavLabel">
-                            <AbsPoint x="0" y="14" />
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="20" y="78" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
@@ -51,8 +51,8 @@
 
                 <Button name="$parentNext" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Anchors>
-                        <Anchor point="topleft" relativePoint="topright" relativeTo="$parentPrev">
-                            <AbsPoint x="8" y="0" />
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="100" y="78" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
@@ -62,8 +62,8 @@
 
                 <Button name="$parentFilterDmg" inherits="EA_Button_DefaultCheckBox" layer="popup">
                     <Anchors>
-                        <Anchor point="topleft" relativePoint="topright" relativeTo="$parentNext">
-                            <AbsPoint x="20" y="0" />
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="200" y="78" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
@@ -73,23 +73,14 @@
 
                 <Button name="$parentFilterBuffs" inherits="EA_Button_DefaultCheckBox" layer="popup">
                     <Anchors>
-                        <Anchor point="topleft" relativePoint="topright" relativeTo="$parentFilterDmg">
-                            <AbsPoint x="80" y="0" />
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="300" y="78" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
                         <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnToggleBuffs"/>
                     </EventHandlers>
                 </Button>
-
-                <Label name="$parentTimeline" font="font_chat_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="true">
-                    <Size><AbsPoint x="440" y="290" /></Size>
-                    <Anchors>
-                        <Anchor point="topleft" relativePoint="bottomleft" relativeTo="$parentPrev">
-                            <AbsPoint x="0" y="14" />
-                        </Anchor>
-                    </Anchors>
-                </Label>
 
                 <Button name="$parentClose" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Anchors>
@@ -101,6 +92,15 @@
                         <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnClose"/>
                     </EventHandlers>
                 </Button>
+
+                <Label name="$parentTimeline" font="font_chat_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="true">
+                    <Size><AbsPoint x="440" y="280" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="20" y="120" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
             </Windows>
         </Window>
     </Windows>

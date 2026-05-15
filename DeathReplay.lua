@@ -321,7 +321,3 @@ end
 
 -- Wrap all public entry points in pcall + trace for diagnosis.
 DeathReplay.HandleSlash             = dr_safe("HandleSlash",             DeathReplay.HandleSlash,             true)
-DeathReplay.OnCombatEvent           = dr_safe("OnCombatEvent",           DeathReplay.OnCombatEvent,           false)
-DeathReplay.OnEffectsUpdated        = dr_safe("OnEffectsUpdated",        DeathReplay.OnEffectsUpdated,        false)
-DeathReplay.OnHitPointsUpdated      = dr_safe("OnHitPointsUpdated",      DeathReplay.OnHitPointsUpdated,      false)
-DeathReplay.OnContextMaybeChanged   = dr_safe("OnContextMaybeChanged",   DeathReplay.OnContextMaybeChanged,   true)
