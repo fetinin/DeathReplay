@@ -29,6 +29,9 @@ local COMBAT_EVENT_KIND = {
 }
 local recentEvents          = {}   -- chronological, oldest first; each entry has .t (GetComputerTime) + kind + payload
 
+local lastEffectSnapshot = {}      -- keyed by tostring(buffId) .. "|" .. tostring(casterId)
+local effectsBaseline = false      -- true once we've seeded from GetBuffs after LOADING_END
+
 local function isRvrZone(zoneId)
     return RVR_ZONES[zoneId] == true
 end
@@ -44,8 +47,24 @@ local function isDefenderPlayer(objectID)
     return objectID == GameData.Player.worldObjNum
 end
 
+local function snapshotEffects(buffList)
+    local snap = {}
+    if buffList == nil then return snap end
+    for _, b in ipairs(buffList) do
+        local key = tostring(b.id or b.buffId or 0) .. "|" .. tostring(b.casterId or 0)
+        snap[key] = b
+    end
+    return snap
+end
+
+local function seedEffectsBaseline()
+    lastEffectSnapshot = snapshotEffects(GetBuffs(GameData.BuffTargetType.SELF))
+    effectsBaseline = true
+end
+
 function DeathReplay.OnContextMaybeChanged()
     recomputePvpContext()
+    seedEffectsBaseline()
 end
 
 local function defaultSavedVariables()
@@ -97,6 +116,32 @@ function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
     })
 end
 
+function DeathReplay.OnEffectsUpdated(changedEffects, isFullList)
+    if not isPvpNow then return end
+    if not effectsBaseline then return end
+    local current = snapshotEffects(GetBuffs(GameData.BuffTargetType.SELF))
+    for key, eff in pairs(current) do
+        if lastEffectSnapshot[key] == nil then
+            pushEvent({
+                kind     = "BUFF_GAIN",
+                name     = eff.name or L"?",
+                buffId   = eff.id or eff.buffId or 0,
+                duration = eff.duration or 0,
+            })
+        end
+    end
+    for key, eff in pairs(lastEffectSnapshot) do
+        if current[key] == nil then
+            pushEvent({
+                kind   = "BUFF_LOSS",
+                name   = eff.name or L"?",
+                buffId = eff.id or eff.buffId or 0,
+            })
+        end
+    end
+    lastEffectSnapshot = current
+end
+
 function DeathReplay.OnInitialize()
     if DeathReplay_SavedVariables == nil then
         DeathReplay_SavedVariables = defaultSavedVariables()
@@ -112,6 +157,8 @@ function DeathReplay.OnInitialize()
 
     RegisterEventHandler(SystemData.Events.WORLD_OBJ_COMBAT_EVENT, "DeathReplay.OnCombatEvent")
 
+    RegisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
+
     EA_ChatWindow.Print(L"DeathReplay v0.1.0 loaded.")
 end
 
@@ -121,6 +168,8 @@ function DeathReplay.OnShutdown()
     UnregisterEventHandler(SystemData.Events.SCENARIO_INSTANCE_JOIN_NOW, "DeathReplay.OnContextMaybeChanged")
 
     UnregisterEventHandler(SystemData.Events.WORLD_OBJ_COMBAT_EVENT, "DeathReplay.OnCombatEvent")
+
+    UnregisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
 end
 
 function DeathReplay.OnUpdate(elapsed)
