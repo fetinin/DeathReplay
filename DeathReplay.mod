@@ -13,6 +13,8 @@
             <File name="DeathReplay.lua" />
             <File name="DeathReplay_Indicator.xml" />
             <File name="DeathReplay_Indicator.lua" />
+            <File name="DeathReplay_GUI.xml" />
+            <File name="DeathReplay_GUI.lua" />
         </Files>
         <SavedVariables>
             <SavedVariable name="DeathReplay_SavedVariables" />
@@ -20,6 +22,7 @@
         <OnInitialize>
             <CallFunction name="DeathReplay.OnInitialize" />
             <CreateWindow name="DeathReplay_Indicator" show="true" />
+            <CreateWindow name="DeathReplay_GUI" show="false" />
         </OnInitialize>
         <OnShutdown>
             <CallFunction name="DeathReplay.OnShutdown" />

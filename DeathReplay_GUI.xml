@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Interface xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <Windows>
+        <Window name="DeathReplay_GUI" inherits="EA_DefaultWindowSkin" movable="true">
+            <Size>
+                <AbsPoint x="480" y="420" />
+            </Size>
+            <Anchors>
+                <Anchor point="center" relativeTo="Root" relativePoint="center"/>
+            </Anchors>
+            <Windows>
+                <Label name="$parentTitle" font="font_default_large">
+                    <Anchors>
+                        <Anchor point="top" relativeTo="$parent" relativePoint="top">
+                            <AbsPoint x="0" y="12" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+
+                <Label name="$parentNavLabel" font="font_default">
+                    <Anchors>
+                        <Anchor point="top" relativeTo="$parentTitle" relativePoint="bottom">
+                            <AbsPoint x="0" y="6" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+
+                <Button name="$parentPrev" inherits="EA_DefaultButton">
+                    <Size><AbsPoint x="32" y="24" /></Size>
+                    <Anchors>
+                        <Anchor point="topright" relativeTo="$parentNavLabel" relativePoint="topleft">
+                            <AbsPoint x="-8" y="0" />
+                        </Anchor>
+                    </Anchors>
+                    <Text>&lt;</Text>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnPrev"/>
+                    </EventHandlers>
+                </Button>
+
+                <Button name="$parentNext" inherits="EA_DefaultButton">
+                    <Size><AbsPoint x="32" y="24" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativeTo="$parentNavLabel" relativePoint="topright">
+                            <AbsPoint x="8" y="0" />
+                        </Anchor>
+                    </Anchors>
+                    <Text>&gt;</Text>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnNext"/>
+                    </EventHandlers>
+                </Button>
+
+                <Button name="$parentFilterDmg" inherits="EA_DefaultCheckBox">
+                    <Anchors>
+                        <Anchor point="top" relativeTo="$parentNavLabel" relativePoint="bottom">
+                            <AbsPoint x="-60" y="14" />
+                        </Anchor>
+                    </Anchors>
+                    <Text>damage</Text>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnToggleDmg"/>
+                    </EventHandlers>
+                </Button>
+
+                <Button name="$parentFilterBuffs" inherits="EA_DefaultCheckBox">
+                    <Anchors>
+                        <Anchor point="top" relativeTo="$parentNavLabel" relativePoint="bottom">
+                            <AbsPoint x="60" y="14" />
+                        </Anchor>
+                    </Anchors>
+                    <Text>buffs</Text>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnToggleBuffs"/>
+                    </EventHandlers>
+                </Button>
+
+                <Label name="$parentTimeline" font="font_chat_text" multiline="true">
+                    <Size><AbsPoint x="440" y="290" /></Size>
+                    <Anchors>
+                        <Anchor point="top" relativeTo="$parentFilterDmg" relativePoint="bottom">
+                            <AbsPoint x="80" y="14" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+
+                <Button name="$parentClose" inherits="EA_DefaultButton">
+                    <Size><AbsPoint x="32" y="24" /></Size>
+                    <Anchors>
+                        <Anchor point="topright" relativeTo="$parent" relativePoint="topright">
+                            <AbsPoint x="-8" y="8" />
+                        </Anchor>
+                    </Anchors>
+                    <Text>X</Text>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnClose"/>
+                    </EventHandlers>
+                </Button>
+            </Windows>
+        </Window>
+    </Windows>
+</Interface>

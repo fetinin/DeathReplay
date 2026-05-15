@@ -278,17 +278,9 @@ function DeathReplay.OnUpdate(elapsed)
 end
 
 function DeathReplay.HandleSlash(input)
-    local n = #DeathReplay_SavedVariables.deaths
-    if n == 0 then
-        EA_ChatWindow.Print(L"DeathReplay: no deaths captured yet. Die in a scenario or RvR zone to capture your first replay.")
-        return
+    if DeathReplay_GUI and DeathReplay_GUI.Toggle then
+        DeathReplay_GUI.Toggle()
+    else
+        EA_ChatWindow.Print(L"DeathReplay: GUI not loaded. Try /reloadui.")
     end
-    local d = DeathReplay_SavedVariables.deaths[1]
-    local kb = d.killingBlow
-    EA_ChatWindow.Print(L"DeathReplay: " .. towstring(n) .. L" death(s) captured. Newest:")
-    EA_ChatWindow.Print(L"  zone=" .. (d.zone or L"?") .. L"  events=" .. towstring(#d.events))
-    if kb then
-        EA_ChatWindow.Print(L"  killing blow: " .. (kb.ability or L"?") .. L" for " .. towstring(kb.amount or 0))
-    end
-    EA_ChatWindow.Print(L"  (full window UI in task 10)")
 end
