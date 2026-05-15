@@ -233,28 +233,34 @@ function DeathReplay.OnHitPointsUpdated()
 end
 
 function DeathReplay.OnInitialize()
-    if DeathReplay_SavedVariables == nil then
-        DeathReplay_SavedVariables = defaultSavedVariables()
+    local function init()
+        if DeathReplay_SavedVariables == nil then
+            DeathReplay_SavedVariables = defaultSavedVariables()
+        end
+        -- Migration scaffold: if version older than SCHEMA_VERSION, run migrations.
+        -- No migrations exist yet (we are v1).
+
+        LibSlash.RegisterSlashCmd("dr", function(input) DeathReplay.HandleSlash(input) end)
+
+        RegisterEventHandler(SystemData.Events.LOADING_END,                "DeathReplay.OnContextMaybeChanged")
+        RegisterEventHandler(SystemData.Events.PLAYER_AREA_NAME_CHANGED,   "DeathReplay.OnContextMaybeChanged")
+        RegisterEventHandler(SystemData.Events.SCENARIO_INSTANCE_JOIN_NOW, "DeathReplay.OnContextMaybeChanged")
+
+        RegisterEventHandler(SystemData.Events.WORLD_OBJ_COMBAT_EVENT, "DeathReplay.OnCombatEvent")
+
+        RegisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
+
+        RegisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
+
+        EA_ChatWindow.Print(L"DeathReplay v0.1.0 loaded.")
+
+        if DeathReplayIndicator and DeathReplayIndicator.Recompute then
+            DeathReplayIndicator.Recompute()
+        end
     end
-    -- Migration scaffold: if version older than SCHEMA_VERSION, run migrations.
-    -- No migrations exist yet (we are v1).
-
-    LibSlash.RegisterSlashCmd("dr", function(input) DeathReplay.HandleSlash(input) end)
-
-    RegisterEventHandler(SystemData.Events.LOADING_END,                "DeathReplay.OnContextMaybeChanged")
-    RegisterEventHandler(SystemData.Events.PLAYER_AREA_NAME_CHANGED,   "DeathReplay.OnContextMaybeChanged")
-    RegisterEventHandler(SystemData.Events.SCENARIO_INSTANCE_JOIN_NOW, "DeathReplay.OnContextMaybeChanged")
-
-    RegisterEventHandler(SystemData.Events.WORLD_OBJ_COMBAT_EVENT, "DeathReplay.OnCombatEvent")
-
-    RegisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
-
-    RegisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
-
-    EA_ChatWindow.Print(L"DeathReplay v0.1.0 loaded.")
-
-    if DeathReplayIndicator and DeathReplayIndicator.Recompute then
-        DeathReplayIndicator.Recompute()
+    local ok, err = pcall(init)
+    if not ok then
+        EA_ChatWindow.Print(L"DeathReplay INIT ERROR: " .. towstring(tostring(err)))
     end
 end
 

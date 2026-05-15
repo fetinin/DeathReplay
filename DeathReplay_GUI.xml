@@ -9,6 +9,17 @@
                 <Anchor point="center" relativeTo="Root" relativePoint="center"/>
             </Anchors>
             <Windows>
+                <Window name="$parentBackground" inherits="EA_Window_DefaultFrame" layer="background">
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parent">
+                            <AbsPoint x="0" y="0"/>
+                        </Anchor>
+                        <Anchor point="bottomright" relativePoint="bottomright" relativeTo="$parent">
+                            <AbsPoint x="0" y="0"/>
+                        </Anchor>
+                    </Anchors>
+                </Window>
+
                 <Label name="$parentTitle" font="font_default_large">
                     <Anchors>
                         <Anchor point="top" relativeTo="$parent" relativePoint="top">

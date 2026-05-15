@@ -14,6 +14,18 @@
                 <EventHandler event="OnLButtonUp" function="DeathReplayIndicator.OnClick" />
                 <EventHandler event="OnMouseOver" function="DeathReplayIndicator.OnMouseOver" />
             </EventHandlers>
+            <Windows>
+                <Window name="$parentBackground" inherits="EA_Window_DefaultFrame" layer="background">
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parent">
+                            <AbsPoint x="0" y="0"/>
+                        </Anchor>
+                        <Anchor point="bottomright" relativePoint="bottomright" relativeTo="$parent">
+                            <AbsPoint x="0" y="0"/>
+                        </Anchor>
+                    </Anchors>
+                </Window>
+            </Windows>
         </Window>
     </Windows>
 </Interface>
