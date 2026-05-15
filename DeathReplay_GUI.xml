@@ -20,7 +20,8 @@
                     </Anchors>
                 </Window>
 
-                <Label name="$parentTitle" font="font_default_large">
+                <Label name="$parentTitle" font="font_default_large" inherits="DefaultWindowText" handleinput="false" textalign="center" wordwrap="false">
+                    <Size><AbsPoint x="440" y="24" /></Size>
                     <Anchors>
                         <Anchor point="top" relativeTo="$parent" relativePoint="top">
                             <AbsPoint x="0" y="12" />
@@ -28,7 +29,8 @@
                     </Anchors>
                 </Label>
 
-                <Label name="$parentNavLabel" font="font_default">
+                <Label name="$parentNavLabel" font="font_default" inherits="DefaultWindowText" handleinput="false" textalign="center" wordwrap="false">
+                    <Size><AbsPoint x="440" y="20" /></Size>
                     <Anchors>
                         <Anchor point="top" relativeTo="$parentTitle" relativePoint="bottom">
                             <AbsPoint x="0" y="6" />
@@ -36,7 +38,7 @@
                     </Anchors>
                 </Label>
 
-                <Button name="$parentPrev" inherits="EA_DefaultButton">
+                <Button name="$parentPrev" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Size><AbsPoint x="32" y="24" /></Size>
                     <Anchors>
                         <Anchor point="topright" relativeTo="$parentNavLabel" relativePoint="topleft">
@@ -48,7 +50,7 @@
                     </EventHandlers>
                 </Button>
 
-                <Button name="$parentNext" inherits="EA_DefaultButton">
+                <Button name="$parentNext" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Size><AbsPoint x="32" y="24" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativeTo="$parentNavLabel" relativePoint="topright">
@@ -60,7 +62,7 @@
                     </EventHandlers>
                 </Button>
 
-                <Button name="$parentFilterDmg" inherits="EA_DefaultCheckBox">
+                <Button name="$parentFilterDmg" inherits="EA_Button_DefaultCheckBox" layer="popup">
                     <Anchors>
                         <Anchor point="top" relativeTo="$parentNavLabel" relativePoint="bottom">
                             <AbsPoint x="-60" y="14" />
@@ -71,7 +73,7 @@
                     </EventHandlers>
                 </Button>
 
-                <Button name="$parentFilterBuffs" inherits="EA_DefaultCheckBox">
+                <Button name="$parentFilterBuffs" inherits="EA_Button_DefaultCheckBox" layer="popup">
                     <Anchors>
                         <Anchor point="top" relativeTo="$parentNavLabel" relativePoint="bottom">
                             <AbsPoint x="60" y="14" />
@@ -82,7 +84,7 @@
                     </EventHandlers>
                 </Button>
 
-                <Label name="$parentTimeline" font="font_chat_text" wordwrap="true">
+                <Label name="$parentTimeline" font="font_chat_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="true">
                     <Size><AbsPoint x="440" y="290" /></Size>
                     <Anchors>
                         <Anchor point="top" relativeTo="$parentFilterDmg" relativePoint="bottom">
@@ -91,7 +93,7 @@
                     </Anchors>
                 </Label>
 
-                <Button name="$parentClose" inherits="EA_DefaultButton">
+                <Button name="$parentClose" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Size><AbsPoint x="32" y="24" /></Size>
                     <Anchors>
                         <Anchor point="topright" relativeTo="$parent" relativePoint="topright">
