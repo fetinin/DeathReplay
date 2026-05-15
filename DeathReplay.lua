@@ -193,9 +193,7 @@ local function pushEvent(entry)
 end
 
 function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
-    if not isPvpNow then return end
-
-    -- Temporary probe (delete after empirical verification)
+    -- Temporary probe (delete after empirical verification) — fires unconditionally to verify the event is hooked
     if probe_hits_seen < 5 then
         probe_hits_seen = probe_hits_seen + 1
         EA_ChatWindow.Print(L"DR_PROBE hit#" .. towstring(probe_hits_seen)
@@ -204,9 +202,11 @@ function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
             .. L" objectID(field)=" .. towstring(GameData.Player.objectID or 0)
             .. L" id=" .. towstring(GameData.Player.id or 0)
             .. L" entityId=" .. towstring(GameData.Player.entityId or 0)
+            .. L" isPvpNow=" .. towstring(isPvpNow)
             .. L" amount=" .. towstring(amount))
     end
 
+    if not isPvpNow then return end
     if not isDefenderPlayer(objectID) then return end
     local mapping = COMBAT_EVENT_KIND[combatEvent]
     if mapping == nil then return end       -- v1 ignores misses and unknowns

@@ -20,19 +20,19 @@
                     </Anchors>
                 </Window>
 
-                <Label name="$parentTitle" font="font_default_large" inherits="DefaultWindowText" handleinput="false" textalign="center" wordwrap="false">
-                    <Size><AbsPoint x="440" y="24" /></Size>
+                <Label name="$parentTitle" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="false">
+                    <Size><AbsPoint x="400" y="24" /></Size>
                     <Anchors>
-                        <Anchor point="top" relativeTo="$parentBackground" relativePoint="top">
-                            <AbsPoint x="0" y="12" />
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="20" y="14" />
                         </Anchor>
                     </Anchors>
                 </Label>
 
-                <Label name="$parentNavLabel" font="font_default" inherits="DefaultWindowText" handleinput="false" textalign="center" wordwrap="false">
+                <Label name="$parentNavLabel" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="false">
                     <Size><AbsPoint x="440" y="20" /></Size>
                     <Anchors>
-                        <Anchor point="top" relativeTo="$parentTitle" relativePoint="bottom">
+                        <Anchor point="topleft" relativePoint="bottomleft" relativeTo="$parentTitle">
                             <AbsPoint x="0" y="6" />
                         </Anchor>
                     </Anchors>
@@ -40,8 +40,8 @@
 
                 <Button name="$parentPrev" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Anchors>
-                        <Anchor point="topright" relativeTo="$parentNavLabel" relativePoint="topleft">
-                            <AbsPoint x="-8" y="0" />
+                        <Anchor point="topleft" relativePoint="bottomleft" relativeTo="$parentNavLabel">
+                            <AbsPoint x="0" y="14" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
@@ -51,7 +51,7 @@
 
                 <Button name="$parentNext" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Anchors>
-                        <Anchor point="topleft" relativeTo="$parentNavLabel" relativePoint="topright">
+                        <Anchor point="topleft" relativePoint="topright" relativeTo="$parentPrev">
                             <AbsPoint x="8" y="0" />
                         </Anchor>
                     </Anchors>
@@ -62,8 +62,8 @@
 
                 <Button name="$parentFilterDmg" inherits="EA_Button_DefaultCheckBox" layer="popup">
                     <Anchors>
-                        <Anchor point="top" relativeTo="$parentNavLabel" relativePoint="bottom">
-                            <AbsPoint x="-60" y="14" />
+                        <Anchor point="topleft" relativePoint="topright" relativeTo="$parentNext">
+                            <AbsPoint x="20" y="0" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
@@ -73,8 +73,8 @@
 
                 <Button name="$parentFilterBuffs" inherits="EA_Button_DefaultCheckBox" layer="popup">
                     <Anchors>
-                        <Anchor point="top" relativeTo="$parentNavLabel" relativePoint="bottom">
-                            <AbsPoint x="60" y="14" />
+                        <Anchor point="topleft" relativePoint="topright" relativeTo="$parentFilterDmg">
+                            <AbsPoint x="80" y="0" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
@@ -85,16 +85,16 @@
                 <Label name="$parentTimeline" font="font_chat_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="true">
                     <Size><AbsPoint x="440" y="290" /></Size>
                     <Anchors>
-                        <Anchor point="top" relativeTo="$parentFilterDmg" relativePoint="bottom">
-                            <AbsPoint x="80" y="14" />
+                        <Anchor point="topleft" relativePoint="bottomleft" relativeTo="$parentPrev">
+                            <AbsPoint x="0" y="14" />
                         </Anchor>
                     </Anchors>
                 </Label>
 
                 <Button name="$parentClose" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Anchors>
-                        <Anchor point="topright" relativeTo="$parentBackground" relativePoint="topright">
-                            <AbsPoint x="-8" y="8" />
+                        <Anchor point="topright" relativePoint="topright" relativeTo="$parentBackground">
+                            <AbsPoint x="-12" y="14" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>

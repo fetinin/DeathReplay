@@ -66,11 +66,14 @@ function DeathReplay_GUI.Render()
     if #list == 0 then
         EA_ChatWindow.Print(L"DR_DEBUG empty state - setting Title to 'DeathReplay'")
         LabelSetText("DeathReplay_GUITitle", L"DeathReplay")
+        LabelSetTextColor("DeathReplay_GUITitle", 255, 255, 255)
         EA_ChatWindow.Print(L"DR_DEBUG empty state - setting NavLabel to ''")
         LabelSetText("DeathReplay_GUINavLabel", L"")
+        LabelSetTextColor("DeathReplay_GUINavLabel", 255, 255, 255)
         EA_ChatWindow.Print(L"DR_DEBUG empty state - setting Timeline placeholder")
         LabelSetText("DeathReplay_GUITimeline",
             L"No deaths captured yet. Die in a scenario or RvR zone to capture your first replay.")
+        LabelSetTextColor("DeathReplay_GUITimeline", 255, 255, 255)
         return
     end
     if state.currentIndex < 1 then state.currentIndex = 1 end
@@ -81,14 +84,17 @@ function DeathReplay_GUI.Render()
     local titleText = L"DeathReplay   " .. towstring(state.currentIndex) .. L"/" .. towstring(#list)
     EA_ChatWindow.Print(L"DR_DEBUG LabelSetText DeathReplay_GUITitle = " .. titleText)
     LabelSetText("DeathReplay_GUITitle", titleText)
+    LabelSetTextColor("DeathReplay_GUITitle", 255, 255, 255)
 
     local navText = (d.zone or L"?") .. L"  -  killed by " .. kbName
     EA_ChatWindow.Print(L"DR_DEBUG LabelSetText DeathReplay_GUINavLabel = " .. navText)
     LabelSetText("DeathReplay_GUINavLabel", navText)
+    LabelSetTextColor("DeathReplay_GUINavLabel", 255, 255, 255)
 
     local timelineText = renderTimeline(d)
     EA_ChatWindow.Print(L"DR_DEBUG LabelSetText DeathReplay_GUITimeline length=" .. towstring(wstring.len(timelineText)))
     LabelSetText("DeathReplay_GUITimeline", timelineText)
+    LabelSetTextColor("DeathReplay_GUITimeline", 255, 255, 255)
 
     -- Mark this death viewed.
     if d.viewed == false then
