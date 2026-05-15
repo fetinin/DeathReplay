@@ -33,6 +33,7 @@ local RVR_ZONES = {
 local isPvpNow = false   -- cached; updated by DeathReplay.OnContextMaybeChanged
 
 local probe_hits_seen = 0
+local probe_text_hits_seen = 0
 
 local BUFFER_WINDOW_S       = 10
 local MAX_EVENTS_BUFFERED   = 500
@@ -221,6 +222,16 @@ function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
     })
 end
 
+function DeathReplay.OnCombatLogUpdate(updateType, ...)
+    if probe_text_hits_seen < 5 then
+        probe_text_hits_seen = probe_text_hits_seen + 1
+        local args = {...}
+        EA_ChatWindow.Print(L"DR_PROBE_TEXT update#" .. towstring(probe_text_hits_seen)
+            .. L" type=" .. towstring(updateType)
+            .. L" nargs=" .. towstring(#args))
+    end
+end
+
 function DeathReplay.OnEffectsUpdated(changedEffects, isFullList)
     if not isPvpNow then return end
     if not effectsBaseline then return end
@@ -274,7 +285,15 @@ function DeathReplay.OnInitialize()
         RegisterEventHandler(SystemData.Events.PLAYER_AREA_NAME_CHANGED,   "DeathReplay.OnContextMaybeChanged")
         RegisterEventHandler(SystemData.Events.SCENARIO_INSTANCE_JOIN_NOW, "DeathReplay.OnContextMaybeChanged")
 
-        RegisterEventHandler(SystemData.Events.WORLD_OBJ_COMBAT_EVENT, "DeathReplay.OnCombatEvent")
+        local combatEventId = SystemData.Events.WORLD_OBJ_COMBAT_EVENT
+        EA_ChatWindow.Print(L"DR_VERIFY WORLD_OBJ_COMBAT_EVENT id=" .. towstring(combatEventId or "NIL"))
+        RegisterEventHandler(combatEventId, "DeathReplay.OnCombatEvent")
+        EA_ChatWindow.Print(L"DR_VERIFY registered DeathReplay.OnCombatEvent for combat events")
+
+        local combatLogEventId = TextLogGetUpdateEventId("Combat")
+        EA_ChatWindow.Print(L"DR_VERIFY Combat text log event id=" .. towstring(combatLogEventId or "NIL"))
+        RegisterEventHandler(combatLogEventId, "DeathReplay.OnCombatLogUpdate")
+        EA_ChatWindow.Print(L"DR_VERIFY registered DeathReplay.OnCombatLogUpdate for combat text log")
 
         RegisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
 
@@ -298,6 +317,8 @@ function DeathReplay.OnShutdown()
     UnregisterEventHandler(SystemData.Events.SCENARIO_INSTANCE_JOIN_NOW, "DeathReplay.OnContextMaybeChanged")
 
     UnregisterEventHandler(SystemData.Events.WORLD_OBJ_COMBAT_EVENT, "DeathReplay.OnCombatEvent")
+
+    UnregisterEventHandler(TextLogGetUpdateEventId("Combat"), "DeathReplay.OnCombatLogUpdate")
 
     UnregisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
 
