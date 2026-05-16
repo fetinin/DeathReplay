@@ -1,30 +1,78 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Interface xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<Interface xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../Interface.xsd">
+    <Scripts>
+        <Script file="DeathReplay_GUI.lua"/>
+    </Scripts>
     <Windows>
-        <Window name="DeathReplay_GUI" inherits="EA_Window_Default" movable="true" handleinput="true" savesettings="true" layer="popup">
+        <Window name="DeathReplay_GUI" movable="true" handleinput="true" savesettings="true" layer="popup">
             <Size>
                 <AbsPoint x="480" y="420" />
             </Size>
             <Anchors>
-                <Anchor point="center" relativeTo="Root" relativePoint="center"/>
+                <Anchor point="center" relativePoint="center" relativeTo="">
+                    <AbsPoint x="0" y="0"/>
+                </Anchor>
             </Anchors>
             <Windows>
-                <FullResizeImage name="$parentBackground" inherits="EA_FullResizeImage_MetalFill">
+                <Window name="$parentBackground" inherits="EA_Window_DefaultFrame">
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parent">
-                            <AbsPoint x="0" y="0"/>
+                            <AbsPoint x="0" y="32"/>
                         </Anchor>
                         <Anchor point="bottomright" relativePoint="bottomright" relativeTo="$parent">
                             <AbsPoint x="0" y="0"/>
                         </Anchor>
                     </Anchors>
-                </FullResizeImage>
+                </Window>
 
-                <Label name="$parentTitle" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="false">
-                    <Size><AbsPoint x="400" y="24" /></Size>
+                <Window name="$parentTitleBar" inherits="EA_TitleBar_Default"/>
+
+                <Button name="$parentClose" inherits="EA_Button_DefaultWindowClose">
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnClose"/>
+                    </EventHandlers>
+                </Button>
+
+                <Window name="$parentFooter" inherits="EA_Window_DefaultButtonBottomFrame" layer="background">
+                    <Size><AbsPoint x="0" y="56" /></Size>
+                </Window>
+
+                <Button name="$parentFilterDmg" inherits="EA_Button_DefaultCheckBox" layer="popup">
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
                             <AbsPoint x="20" y="14" />
+                        </Anchor>
+                    </Anchors>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnToggleDmg"/>
+                    </EventHandlers>
+                </Button>
+
+                <Label name="$parentFilterDmgLabel" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="false">
+                    <Size><AbsPoint x="70" y="20" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="50" y="16" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+
+                <Button name="$parentFilterBuffs" inherits="EA_Button_DefaultCheckBox" layer="popup">
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="140" y="14" />
+                        </Anchor>
+                    </Anchors>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnToggleBuffs"/>
+                    </EventHandlers>
+                </Button>
+
+                <Label name="$parentFilterBuffsLabel" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="false">
+                    <Size><AbsPoint x="60" y="20" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="170" y="16" />
                         </Anchor>
                     </Anchors>
                 </Label>
@@ -33,15 +81,24 @@
                     <Size><AbsPoint x="440" y="20" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="44" />
+                            <AbsPoint x="20" y="46" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+
+                <Label name="$parentTimeline" font="font_chat_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="true">
+                    <Size><AbsPoint x="448" y="200" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="20" y="74" />
                         </Anchor>
                     </Anchors>
                 </Label>
 
                 <Button name="$parentPrev" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Anchors>
-                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="78" />
+                        <Anchor point="bottomleft" relativePoint="bottomleft" relativeTo="$parent">
+                            <AbsPoint x="0" y="-4" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
@@ -51,56 +108,14 @@
 
                 <Button name="$parentNext" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Anchors>
-                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="100" y="78" />
+                        <Anchor point="bottomright" relativePoint="bottomright" relativeTo="$parent">
+                            <AbsPoint x="0" y="-4" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
                         <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnNext"/>
                     </EventHandlers>
                 </Button>
-
-                <Button name="$parentFilterDmg" inherits="EA_Button_DefaultCheckBox" layer="popup">
-                    <Anchors>
-                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="200" y="78" />
-                        </Anchor>
-                    </Anchors>
-                    <EventHandlers>
-                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnToggleDmg"/>
-                    </EventHandlers>
-                </Button>
-
-                <Button name="$parentFilterBuffs" inherits="EA_Button_DefaultCheckBox" layer="popup">
-                    <Anchors>
-                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="300" y="78" />
-                        </Anchor>
-                    </Anchors>
-                    <EventHandlers>
-                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnToggleBuffs"/>
-                    </EventHandlers>
-                </Button>
-
-                <Button name="$parentClose" inherits="EA_Button_DefaultResizeable" layer="popup">
-                    <Anchors>
-                        <Anchor point="topright" relativePoint="topright" relativeTo="$parentBackground">
-                            <AbsPoint x="-12" y="14" />
-                        </Anchor>
-                    </Anchors>
-                    <EventHandlers>
-                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnClose"/>
-                    </EventHandlers>
-                </Button>
-
-                <Label name="$parentTimeline" font="font_chat_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="true">
-                    <Size><AbsPoint x="440" y="280" /></Size>
-                    <Anchors>
-                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="120" />
-                        </Anchor>
-                    </Anchors>
-                </Label>
             </Windows>
         </Window>
     </Windows>

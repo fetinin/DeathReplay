@@ -5,9 +5,11 @@ DeathReplay_GUI = {}
 -- Diagnostic helper: wrap entry points in pcall + trace for silent error detection.
 local function dr_safe(fn_name, fn)
     return function(...)
-        EA_ChatWindow.Print(L"DR_TRACE " .. towstring(fn_name))
+        if DeathReplay.IsDebug() then
+            EA_ChatWindow.Print(L"DR_TRACE " .. towstring(fn_name))
+        end
         local ok, err = pcall(fn, ...)
-        if not ok then
+        if not ok and DeathReplay.IsDebug() then
             EA_ChatWindow.Print(L"DR_ERR " .. towstring(fn_name) .. L": " .. towstring(tostring(err)))
         end
     end
@@ -62,15 +64,14 @@ end
 
 function DeathReplay_GUI.Render()
     local list = deaths()
-    EA_ChatWindow.Print(L"DR_DEBUG Render: deaths=" .. towstring(#list))
+    DeathReplay.DebugPrint(L"DR_DEBUG Render: deaths=" .. towstring(#list))
     if #list == 0 then
-        EA_ChatWindow.Print(L"DR_DEBUG empty state - setting Title to 'DeathReplay'")
-        LabelSetText("DeathReplay_GUITitle", L"DeathReplay")
-        LabelSetTextColor("DeathReplay_GUITitle", 255, 255, 255)
-        EA_ChatWindow.Print(L"DR_DEBUG empty state - setting NavLabel to ''")
+        DeathReplay.DebugPrint(L"DR_DEBUG empty state - setting TitleBar to 'DeathReplay'")
+        LabelSetText("DeathReplay_GUITitleBarText", L"DeathReplay")
+        DeathReplay.DebugPrint(L"DR_DEBUG empty state - setting NavLabel to ''")
         LabelSetText("DeathReplay_GUINavLabel", L"")
         LabelSetTextColor("DeathReplay_GUINavLabel", 255, 255, 255)
-        EA_ChatWindow.Print(L"DR_DEBUG empty state - setting Timeline placeholder")
+        DeathReplay.DebugPrint(L"DR_DEBUG empty state - setting Timeline placeholder")
         LabelSetText("DeathReplay_GUITimeline",
             L"No deaths captured yet. Die in a scenario or RvR zone to capture your first replay.")
         LabelSetTextColor("DeathReplay_GUITimeline", 255, 255, 255)
@@ -82,17 +83,16 @@ function DeathReplay_GUI.Render()
     local kbName = (d.killingBlow and d.killingBlow.ability) or L"unknown"
 
     local titleText = L"DeathReplay   " .. towstring(state.currentIndex) .. L"/" .. towstring(#list)
-    EA_ChatWindow.Print(L"DR_DEBUG LabelSetText DeathReplay_GUITitle = " .. titleText)
-    LabelSetText("DeathReplay_GUITitle", titleText)
-    LabelSetTextColor("DeathReplay_GUITitle", 255, 255, 255)
+    DeathReplay.DebugPrint(L"DR_DEBUG LabelSetText DeathReplay_GUITitleBarText = " .. titleText)
+    LabelSetText("DeathReplay_GUITitleBarText", titleText)
 
     local navText = (d.zone or L"?") .. L"  -  killed by " .. kbName
-    EA_ChatWindow.Print(L"DR_DEBUG LabelSetText DeathReplay_GUINavLabel = " .. navText)
+    DeathReplay.DebugPrint(L"DR_DEBUG LabelSetText DeathReplay_GUINavLabel = " .. navText)
     LabelSetText("DeathReplay_GUINavLabel", navText)
     LabelSetTextColor("DeathReplay_GUINavLabel", 255, 255, 255)
 
     local timelineText = renderTimeline(d)
-    EA_ChatWindow.Print(L"DR_DEBUG LabelSetText DeathReplay_GUITimeline length=" .. towstring(wstring.len(timelineText)))
+    DeathReplay.DebugPrint(L"DR_DEBUG LabelSetText DeathReplay_GUITimeline length=" .. towstring(wstring.len(timelineText)))
     LabelSetText("DeathReplay_GUITimeline", timelineText)
     LabelSetTextColor("DeathReplay_GUITimeline", 255, 255, 255)
 
@@ -111,12 +111,13 @@ end
 function DeathReplay_GUI.Show()
     state.visible = true
     WindowSetShowing("DeathReplay_GUI", true)
-    EA_ChatWindow.Print(L"DR_DEBUG calling ButtonSetText on 5 buttons (Prev/Next/FilterDmg/FilterBuffs/Close)")
-    ButtonSetText("DeathReplay_GUIPrev",        L"<")
-    ButtonSetText("DeathReplay_GUINext",        L">")
-    ButtonSetText("DeathReplay_GUIFilterDmg",   L"damage")
-    ButtonSetText("DeathReplay_GUIFilterBuffs", L"buffs")
-    ButtonSetText("DeathReplay_GUIClose",       L"X")
+    DeathReplay.DebugPrint(L"DR_DEBUG setting button + checkbox label text")
+    ButtonSetText("DeathReplay_GUIPrev", L"<")
+    ButtonSetText("DeathReplay_GUINext", L">")
+    LabelSetText("DeathReplay_GUIFilterDmgLabel",   L"damage")
+    LabelSetText("DeathReplay_GUIFilterBuffsLabel", L"buffs")
+    LabelSetTextColor("DeathReplay_GUIFilterDmgLabel",   255, 255, 255)
+    LabelSetTextColor("DeathReplay_GUIFilterBuffsLabel", 255, 255, 255)
     DeathReplay_GUI.Render()
 end
 
@@ -130,12 +131,12 @@ function DeathReplay_GUI.Toggle()
 end
 
 function DeathReplay_GUI.OnPrev()
-    state.currentIndex = state.currentIndex + 1   -- older death = higher index
+    state.currentIndex = state.currentIndex - 1   -- '<' walks toward newer (lower index)
     DeathReplay_GUI.Render()
 end
 
 function DeathReplay_GUI.OnNext()
-    state.currentIndex = state.currentIndex - 1   -- newer death = lower index
+    state.currentIndex = state.currentIndex + 1   -- '>' walks toward older (higher index)
     DeathReplay_GUI.Render()
 end
 
