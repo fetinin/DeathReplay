@@ -5,9 +5,11 @@ DeathReplayIndicator = {}
 -- Diagnostic helper: wrap entry points in pcall + trace for silent error detection.
 local function dr_safe(fn_name, fn)
     return function(...)
-        EA_ChatWindow.Print(L"DR_TRACE " .. towstring(fn_name))
+        if DeathReplay.IsDebug() then
+            EA_ChatWindow.Print(L"DR_TRACE " .. towstring(fn_name))
+        end
         local ok, err = pcall(fn, ...)
-        if not ok then
+        if not ok and DeathReplay.IsDebug() then
             EA_ChatWindow.Print(L"DR_ERR " .. towstring(fn_name) .. L": " .. towstring(tostring(err)))
         end
     end
