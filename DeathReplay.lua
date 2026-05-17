@@ -3,7 +3,7 @@
 DeathReplay = {}
 DeathReplay_SavedVariables = nil   -- engine populates from disk on load, or leaves nil on first run
 
-local SCHEMA_VERSION = 1
+local SCHEMA_VERSION = 2
 
 function DeathReplay.IsDebug()
     return DeathReplay_SavedVariables ~= nil
@@ -49,9 +49,6 @@ local COMBAT_EVENT_KIND = {
 }
 local recentEvents          = {}   -- chronological, oldest first; each entry has .t (GetGameTime seconds) + kind + payload
 
-local lastEffectSnapshot = {}      -- keyed by tostring(buffId) .. "|" .. tostring(casterId)
-local effectsBaseline = false      -- true once we've seeded from GetBuffs after LOADING_END
-
 local deathState  = "alive"      -- "alive" | "dead"
 local captureDone = false        -- prevents double-capture on HP=0 re-fires
 
@@ -92,10 +89,6 @@ local function captureDeath()
                 amount    = e.amount,
             }
             entry.killingBlow = true       -- will be cleared below for non-final HITs
-        elseif e.kind == "BUFF_GAIN" or e.kind == "BUFF_LOSS" then
-            entry.name     = e.name
-            entry.buffId   = e.buffId
-            entry.duration = e.duration
         end
         table.insert(events, entry)
     end
@@ -149,24 +142,8 @@ local function isDefenderPlayer(objectID)
     return objectID == GameData.Player.worldObjNum
 end
 
-local function snapshotEffects(buffList)
-    local snap = {}
-    if buffList == nil then return snap end
-    for _, b in ipairs(buffList) do
-        local key = tostring(b.id or b.buffId or 0) .. "|" .. tostring(b.casterId or 0)
-        snap[key] = b
-    end
-    return snap
-end
-
-local function seedEffectsBaseline()
-    lastEffectSnapshot = snapshotEffects(GetBuffs(GameData.BuffTargetType.SELF))
-    effectsBaseline = true
-end
-
 function DeathReplay.OnContextMaybeChanged()
     recomputePvpContext()
-    seedEffectsBaseline()
 end
 
 local function defaultSavedVariables()
@@ -222,32 +199,6 @@ function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
     })
 end
 
-function DeathReplay.OnEffectsUpdated(changedEffects, isFullList)
-    if not isPvpNow then return end
-    if not effectsBaseline then return end
-    local current = snapshotEffects(GetBuffs(GameData.BuffTargetType.SELF))
-    for key, eff in pairs(current) do
-        if lastEffectSnapshot[key] == nil then
-            pushEvent({
-                kind     = "BUFF_GAIN",
-                name     = eff.name or L"?",
-                buffId   = eff.id or eff.buffId or 0,
-                duration = eff.duration or 0,
-            })
-        end
-    end
-    for key, eff in pairs(lastEffectSnapshot) do
-        if current[key] == nil then
-            pushEvent({
-                kind   = "BUFF_LOSS",
-                name   = eff.name or L"?",
-                buffId = eff.id or eff.buffId or 0,
-            })
-        end
-    end
-    lastEffectSnapshot = current
-end
-
 function DeathReplay.OnHitPointsUpdated()
     if not isPvpNow then return end
     local hp = GameData.Player.hitPoints and GameData.Player.hitPoints.current or 0
@@ -273,6 +224,24 @@ function DeathReplay.OnInitialize()
             DeathReplay_SavedVariables.config.debug = false
         end
 
+        -- Migration v1 -> v2: drop BUFF_GAIN/BUFF_LOSS entries left over from
+        -- when DeathReplay recorded buff diffs. Safe to delete once all installs
+        -- have run this at least once -- see bd DeathReplay-2cb.
+        if (DeathReplay_SavedVariables.version or 1) < 2 then
+            for _, death in ipairs(DeathReplay_SavedVariables.deaths) do
+                if death.events then
+                    local kept = {}
+                    for _, e in ipairs(death.events) do
+                        if e.kind == "HIT" then
+                            table.insert(kept, e)
+                        end
+                    end
+                    death.events = kept
+                end
+            end
+            DeathReplay_SavedVariables.version = 2
+        end
+
         LibSlash.RegisterSlashCmd("dr", function(input) DeathReplay.HandleSlash(input) end)
 
         RegisterEventHandler(SystemData.Events.LOADING_END,                "DeathReplay.OnContextMaybeChanged")
@@ -283,8 +252,6 @@ function DeathReplay.OnInitialize()
         DeathReplay.DebugPrint(L"DR_VERIFY WORLD_OBJ_COMBAT_EVENT id=" .. towstring(combatEventId or "NIL"))
         RegisterEventHandler(combatEventId, "DeathReplay.OnCombatEvent")
         DeathReplay.DebugPrint(L"DR_VERIFY registered DeathReplay.OnCombatEvent for combat events")
-
-        RegisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
 
         RegisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
 
@@ -306,8 +273,6 @@ function DeathReplay.OnShutdown()
     UnregisterEventHandler(SystemData.Events.SCENARIO_INSTANCE_JOIN_NOW, "DeathReplay.OnContextMaybeChanged")
 
     UnregisterEventHandler(SystemData.Events.WORLD_OBJ_COMBAT_EVENT, "DeathReplay.OnCombatEvent")
-
-    UnregisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
 
     UnregisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
 end

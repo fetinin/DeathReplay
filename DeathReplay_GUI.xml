@@ -37,60 +37,76 @@
                     <Size><AbsPoint x="0" y="56" /></Size>
                 </Window>
 
-                <Button name="$parentFilterDmg" inherits="EA_Button_DefaultCheckBox" layer="popup">
+                <Label name="$parentNavLabel" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="false">
+                    <Size><AbsPoint x="440" y="20" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
                             <AbsPoint x="20" y="14" />
                         </Anchor>
                     </Anchors>
-                    <EventHandlers>
-                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnToggleDmg"/>
-                    </EventHandlers>
-                </Button>
-
-                <Label name="$parentFilterDmgLabel" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="false">
-                    <Size><AbsPoint x="70" y="20" /></Size>
-                    <Anchors>
-                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="50" y="16" />
-                        </Anchor>
-                    </Anchors>
                 </Label>
 
-                <Button name="$parentFilterBuffs" inherits="EA_Button_DefaultCheckBox" layer="popup">
+                <Button name="$parentSortTime" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup">
+                    <Size><AbsPoint x="80" y="30" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="140" y="14" />
+                            <AbsPoint x="20" y="36" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
-                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnToggleBuffs"/>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnSortTime"/>
                     </EventHandlers>
                 </Button>
 
-                <Label name="$parentFilterBuffsLabel" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="false">
-                    <Size><AbsPoint x="60" y="20" /></Size>
+                <!-- Ability column header (non-clickable: no OnLButtonUp). Same widget
+                     as the sort headers for visual consistency with the rest of the row. -->
+                <Button name="$parentHeaderAbility" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup">
+                    <Size><AbsPoint x="230" y="30" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="170" y="16" />
+                            <AbsPoint x="100" y="36" />
                         </Anchor>
                     </Anchors>
-                </Label>
+                </Button>
 
-                <Label name="$parentNavLabel" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="false">
-                    <Size><AbsPoint x="440" y="20" /></Size>
+                <Button name="$parentSortDmg" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup">
+                    <Size><AbsPoint x="100" y="30" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="46" />
+                            <AbsPoint x="330" y="36" />
                         </Anchor>
                     </Anchors>
-                </Label>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnSortDmg"/>
+                    </EventHandlers>
+                </Button>
 
-                <Label name="$parentTimeline" font="font_chat_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="true" maxchars="4096">
-                    <Size><AbsPoint x="448" y="200" /></Size>
+                <ListBox name="$parentTimeline"
+                         scrollbar="EA_ScrollBar_DefaultVerticalChain"
+                         rowdef="DeathReplay_GUI_TimelineRow"
+                         visiblerows="11" rowcount="200" rowspacing="0">
+                    <Size><AbsPoint x="430" y="256" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="74" />
+                            <AbsPoint x="20" y="72" />
+                        </Anchor>
+                    </Anchors>
+                    <ListData table="DeathReplay_GUI.Listdata"
+                              populationfunction="DeathReplay_GUI.OnRowPopulated">
+                        <ListColumns>
+                            <ListColumn windowname="Time"   variable="Time"   format="wstring"/>
+                            <ListColumn windowname="Name"   variable="Name"   format="wstring"/>
+                            <ListColumn windowname="Amount" variable="Amount" format="wstring"/>
+                            <ListColumn windowname="Flags"  variable="Flags"  format="wstring"/>
+                        </ListColumns>
+                    </ListData>
+                </ListBox>
+
+                <Label name="$parentEmptyHint" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="true">
+                    <Size><AbsPoint x="430" y="256" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="20" y="72" />
                         </Anchor>
                     </Anchors>
                 </Label>
@@ -116,6 +132,50 @@
                         <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnNext"/>
                     </EventHandlers>
                 </Button>
+            </Windows>
+        </Window>
+
+        <!-- Row template for the timeline ListBox. Engine instantiates copies named
+             DeathReplay_GUITimelineRow1, ...Row2, ... with child labels
+             ...Row<k>Time, ...Row<k>Type, etc. matching the windowname attrs above.
+             Anchors use explicit AbsPoint offsets from the row's topleft (parent) so
+             instantiated rows position cells relative to the row Button regardless of
+             template-time anchor resolution. -->
+        <Window name="DeathReplay_GUI_TimelineRow">
+            <Size><AbsPoint x="410" y="22" /></Size>
+            <Windows>
+                <Label name="$parentTime" textalign="right" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="70" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="0" y="0" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+                <Label name="$parentName" textalign="left" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="224" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="76" y="0" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+                <Label name="$parentAmount" textalign="right" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="60" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="300" y="0" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+                <Label name="$parentFlags" textalign="left" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="50" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="360" y="0" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
             </Windows>
         </Window>
     </Windows>
