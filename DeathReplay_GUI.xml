@@ -86,7 +86,7 @@
                     </Anchors>
                 </Label>
 
-                <Label name="$parentTimeline" font="font_chat_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="true">
+                <Label name="$parentTimeline" font="font_chat_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="true" maxchars="4096">
                     <Size><AbsPoint x="448" y="200" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">

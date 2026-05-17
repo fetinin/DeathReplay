@@ -26,21 +26,32 @@ local function deaths()
     return DeathReplay_SavedVariables and DeathReplay_SavedVariables.deaths or {}
 end
 
+-- abilityId=0 means melee auto-attack (no ability id from engine).
+local function abilityDisplayName(ability, abilityId)
+    if ability ~= nil and ability ~= L"" then return ability end
+    if (abilityId or 0) == 0 then return L"Melee" end
+    return L"Ability #" .. towstring(abilityId)
+end
+
 local function renderTimeline(d)
     if d == nil then return L"" end
+    -- Iterate newest-first so the killing blow lands on the first row of the
+    -- label. The timeline label has finite height and clips overflow; users
+    -- care most about the final hits, not the oldest ones.
     local lines = {}
-    for _, e in ipairs(d.events) do
+    for i = #d.events, 1, -1 do
+        local e = d.events[i]
         local show = (e.kind == "HIT" and state.filterDmg)
                   or ((e.kind == "BUFF_GAIN" or e.kind == "BUFF_LOSS") and state.filterBuffs)
         if show then
-            local dt = string.format("%6.1fs", e.dt)
+            -- %7.3f keeps millisecond precision and gives consistent column
+            -- width for "-10.000" through "  0.000" with the dt always in
+            -- seconds (GetGameTime returns seconds directly).
+            local dt = string.format("%7.3fs", e.dt)
             if e.kind == "HIT" then
                 local crit = e.crit and L" CRIT" or L""
                 local kb   = e.killingBlow and L" *KB*" or L""
-                local abilityLabel = e.ability
-                if abilityLabel == nil or abilityLabel == L"" then
-                    abilityLabel = L"Ability #" .. towstring(e.abilityId or 0)
-                end
+                local abilityLabel = abilityDisplayName(e.ability, e.abilityId)
                 table.insert(lines, towstring(dt) .. L"  HIT  " .. abilityLabel
                     .. L"  " .. towstring(e.amount or 0) .. crit .. kb)
             elseif e.kind == "BUFF_GAIN" or e.kind == "BUFF_LOSS" then
@@ -80,7 +91,10 @@ function DeathReplay_GUI.Render()
     if state.currentIndex < 1 then state.currentIndex = 1 end
     if state.currentIndex > #list then state.currentIndex = #list end
     local d = list[state.currentIndex]
-    local kbName = (d.killingBlow and d.killingBlow.ability) or L"unknown"
+    local kbName = L"unknown"
+    if d.killingBlow then
+        kbName = abilityDisplayName(d.killingBlow.ability, d.killingBlow.abilityId)
+    end
 
     local titleText = L"DeathReplay   " .. towstring(state.currentIndex) .. L"/" .. towstring(#list)
     DeathReplay.DebugPrint(L"DR_DEBUG LabelSetText DeathReplay_GUITitleBarText = " .. titleText)
