@@ -49,6 +49,65 @@ local COMBAT_EVENT_KIND = {
 }
 local recentEvents          = {}   -- chronological, oldest first; each entry has .t (GetGameTime seconds) + kind + payload
 
+-- abilityId -> iconNum. Harvested at PLAYER_EFFECTS_UPDATED from GetBuffs(SELF)
+-- because GetAbilityData() only resolves icons for the player's own spellbook;
+-- for incoming enemy abilities we need to scrape iconNum off active debuffs.
+-- Covers DoTs / lingering effects; pure direct-damage abilities never appear.
+-- Runtime-only (not persisted) -- fills up as the player gets hit during play.
+local iconCache = {}
+
+local effectFieldDumpDone = false
+local function harvestIconsFromActiveEffects()
+    local effects = GetBuffs(GameData.BuffTargetType.SELF)
+    if effects == nil then
+        if DeathReplay.IsDebug() then
+            EA_ChatWindow.Print(L"DR_BUFF GetBuffs returned nil")
+        end
+        return
+    end
+    local seen = 0
+    local added = 0
+    local firstE = nil
+    -- GetBuffs may return a sparse map (numeric keys not necessarily 1..N), so
+    -- iterate via pairs not ipairs.
+    for _, e in pairs(effects) do
+        seen = seen + 1
+        if firstE == nil then firstE = e end
+        if e.abilityId and e.iconNum and e.iconNum > 0 then
+            if iconCache[e.abilityId] == nil then added = added + 1 end
+            iconCache[e.abilityId] = e.iconNum
+        end
+    end
+    -- One-shot: dump keys of the first effect we see, so we can confirm whether
+    -- `abilityId` is actually a real field name on this engine build.
+    if DeathReplay.IsDebug() and firstE ~= nil and not effectFieldDumpDone then
+        effectFieldDumpDone = true
+        local keys = L""
+        for k, v in pairs(firstE) do
+            keys = keys .. L" " .. towstring(tostring(k)) .. L"=" .. towstring(tostring(v))
+        end
+        EA_ChatWindow.Print(L"DR_BUFF first-effect keys:" .. keys)
+    end
+    if DeathReplay.IsDebug() and (seen > 0 or added > 0) then
+        local n = 0; for _ in pairs(iconCache) do n = n + 1 end
+        EA_ChatWindow.Print(L"DR_BUFF harvest seen=" .. towstring(seen)
+            .. L" added=" .. towstring(added)
+            .. L" cacheSize=" .. towstring(n))
+    end
+end
+
+local function resolveIconForAbility(abilityID)
+    if not abilityID or abilityID == 0 then return nil end
+    -- Player's own outgoing abilities resolve here (cheap, authoritative).
+    -- For most DeathReplay events (incoming damage) this path returns iconNum=0,
+    -- so we fall through to the harvested-from-effects cache.
+    local data = GetAbilityData(abilityID)
+    if data and data.iconNum and data.iconNum > 0 then
+        return data.iconNum
+    end
+    return iconCache[abilityID]
+end
+
 local deathState  = "alive"      -- "alive" | "dead"
 local captureDone = false        -- prevents double-capture on HP=0 re-fires
 
@@ -79,6 +138,7 @@ local function captureDeath()
         if e.kind == "HIT" then
             entry.ability   = e.ability
             entry.abilityId = e.abilityId
+            entry.iconNum   = e.iconNum
             entry.amount    = e.amount
             entry.crit      = e.crit
             -- Last HIT event wins as killing blow.
@@ -86,6 +146,7 @@ local function captureDeath()
                 kind      = (e.crit and "ABILITY_CRITICAL" or "ABILITY_HIT"),
                 ability   = e.ability,
                 abilityId = e.abilityId,
+                iconNum   = e.iconNum,
                 amount    = e.amount,
             }
             entry.killingBlow = true       -- will be cleared below for non-final HITs
@@ -190,13 +251,29 @@ function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
     -- only; same sign-based DAMAGE/HEAL split used in wsct.lua:515-527.
     if amount == nil or amount >= 0 then return end
     local abilityName = GetAbilityName(abilityID)
+    local iconNum = resolveIconForAbility(abilityID)
+    if DeathReplay.IsDebug() then
+        EA_ChatWindow.Print(L"DR_HIT aid=" .. towstring(abilityID)
+            .. L" icon=" .. towstring(iconNum or "nil")
+            .. L" name=" .. towstring(abilityName))
+    end
     pushEvent({
         kind      = mapping.kind,
         crit      = mapping.crit,
         amount    = -amount,
         abilityId = abilityID,
         ability   = abilityName,    -- may be empty wstring if unresolvable
+        iconNum   = iconNum,        -- may be nil if cache miss
     })
+end
+
+-- Engine fires this when a buff/debuff is added/refreshed/removed on the player.
+-- We don't care about the diff -- just re-walk the full SELF effect list and
+-- refresh the iconCache so OnCombatEvent's resolveIconForAbility() has fresh
+-- data for the most common case (an enemy applied a debuff; the next combat
+-- event tick of that debuff will then match the cache).
+function DeathReplay.OnEffectsUpdated()
+    harvestIconsFromActiveEffects()
 end
 
 function DeathReplay.OnHitPointsUpdated()
@@ -255,6 +332,11 @@ function DeathReplay.OnInitialize()
 
         RegisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
 
+        RegisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
+        -- Seed iconCache with whatever's currently active so a hit that lands
+        -- before the first PLAYER_EFFECTS_UPDATED still has a chance to resolve.
+        harvestIconsFromActiveEffects()
+
         EA_ChatWindow.Print(L"DeathReplay v0.1.0 loaded.")
 
         if DeathReplayIndicator and DeathReplayIndicator.Recompute then
@@ -275,6 +357,8 @@ function DeathReplay.OnShutdown()
     UnregisterEventHandler(SystemData.Events.WORLD_OBJ_COMBAT_EVENT, "DeathReplay.OnCombatEvent")
 
     UnregisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
+
+    UnregisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
 end
 
 function DeathReplay.OnUpdate(elapsed)

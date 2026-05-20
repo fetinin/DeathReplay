@@ -152,11 +152,20 @@
                         </Anchor>
                     </Anchors>
                 </Label>
-                <Label name="$parentName" textalign="left" font="font_chat_text" warnOnTextCropped="false">
-                    <Size><AbsPoint x="224" y="22" /></Size>
+                <DynamicImage name="$parentIcon" handleinput="false">
+                    <Size><AbsPoint x="22" y="22" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft">
-                            <AbsPoint x="76" y="0" />
+                            <AbsPoint x="80" y="0" />
+                        </Anchor>
+                    </Anchors>
+                    <TexDims x="64" y="64"/>
+                </DynamicImage>
+                <Label name="$parentName" textalign="left" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="194" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="106" y="0" />
                         </Anchor>
                     </Anchors>
                 </Label>

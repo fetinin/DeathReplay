@@ -87,12 +87,13 @@ local function populateTimeline(d)
                 else flags = flags .. L" *KB*" end
             end
             table.insert(DeathReplay_GUI.Listdata, {
-                Time    = dtText,
-                Name    = abilityDisplayName(e.ability, e.abilityId),
-                Amount  = towstring(e.amount or 0),
-                Flags   = flags,
-                _dt     = e.dt or 0,
-                _amount = e.amount or 0,
+                Time     = dtText,
+                Name     = abilityDisplayName(e.ability, e.abilityId),
+                Amount   = towstring(e.amount or 0),
+                Flags    = flags,
+                _dt      = e.dt or 0,
+                _amount  = e.amount or 0,
+                _iconNum = e.iconNum,   -- captured at hit-time; nil for cache misses / pre-feature deaths
             })
         end
     end
@@ -111,6 +112,29 @@ function DeathReplay_GUI.OnRowPopulated()
             LabelSetTextColor(rowName .. "Name",   255, 255, 255)
             LabelSetTextColor(rowName .. "Amount", 255,  80,  80)
             LabelSetTextColor(rowName .. "Flags",  255, 220,  80)
+
+            -- Icon column: render only if we captured an iconNum at hit-time
+            -- (via DeathReplay.lua's GetBuffs(SELF) harvest). Otherwise hide the
+            -- slot so recycled rows don't show a stale texture from another row.
+            local iconName = rowName .. "Icon"
+            local iconNum = row._iconNum
+            if iconNum and iconNum > 0 then
+                local tex, ix, iy = GetIconData(iconNum)
+                if tex and tex ~= "" and tex ~= "icon000000" then
+                    DynamicImageSetTextureDimensions(iconName, ix, iy)
+                    DynamicImageSetTexture(iconName, tex, ix, iy)
+                    -- Source ability-icon sheet is 64x64; our slot is 22x22.
+                    if ix and ix > 0 then
+                        local s = 22 / ix
+                        DynamicImageSetTextureScale(iconName, s, s)
+                    end
+                    WindowSetShowing(iconName, true)
+                else
+                    WindowSetShowing(iconName, false)
+                end
+            else
+                WindowSetShowing(iconName, false)
+            end
         end
     end
 end
