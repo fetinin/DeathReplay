@@ -6,7 +6,7 @@
     <Windows>
         <Window name="DeathReplay_GUI" movable="true" handleinput="true" savesettings="true" layer="popup">
             <Size>
-                <AbsPoint x="480" y="420" />
+                <AbsPoint x="480" y="446" />
             </Size>
             <Anchors>
                 <Anchor point="center" relativePoint="center" relativeTo="">
@@ -37,11 +37,50 @@
                     <Size><AbsPoint x="0" y="56" /></Size>
                 </Window>
 
+                <!-- Tab strip: switches main content between the aggregated Overview
+                     (default, opened first) and the per-hit Timeline view. Both
+                     buttons fire OnTabClick and are distinguished by the id attribute
+                     (1 = Overview, 2 = Timeline). EA_Button_ListSort is used (same widget as the
+                     column headers below) so the buttons sit IN the window rather
+                     than hanging above the title bar like EA_Button_Tab does. -->
+                <Window name="$parentTabs">
+                    <Size><AbsPoint x="220" y="30" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="20" y="6" />
+                        </Anchor>
+                    </Anchors>
+                    <Windows>
+                        <Button name="$parentOverview" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup" id="1">
+                            <Size><AbsPoint x="100" y="28" /></Size>
+                            <Anchors>
+                                <Anchor point="topleft" relativePoint="topleft" relativeTo="">
+                                    <AbsPoint x="0" y="0" />
+                                </Anchor>
+                            </Anchors>
+                            <EventHandlers>
+                                <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnTabClick"/>
+                            </EventHandlers>
+                        </Button>
+                        <Button name="$parentTimeline" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup" id="2">
+                            <Size><AbsPoint x="100" y="28" /></Size>
+                            <Anchors>
+                                <Anchor point="topleft" relativePoint="topleft" relativeTo="">
+                                    <AbsPoint x="110" y="0" />
+                                </Anchor>
+                            </Anchors>
+                            <EventHandlers>
+                                <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnTabClick"/>
+                            </EventHandlers>
+                        </Button>
+                    </Windows>
+                </Window>
+
                 <Label name="$parentNavLabel" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="false">
                     <Size><AbsPoint x="440" y="20" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="14" />
+                            <AbsPoint x="20" y="40" />
                         </Anchor>
                     </Anchors>
                 </Label>
@@ -50,7 +89,7 @@
                     <Size><AbsPoint x="80" y="30" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="36" />
+                            <AbsPoint x="20" y="62" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
@@ -64,7 +103,7 @@
                     <Size><AbsPoint x="230" y="30" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="100" y="36" />
+                            <AbsPoint x="100" y="62" />
                         </Anchor>
                     </Anchors>
                 </Button>
@@ -73,7 +112,7 @@
                     <Size><AbsPoint x="100" y="30" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="330" y="36" />
+                            <AbsPoint x="330" y="62" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
@@ -88,7 +127,7 @@
                     <Size><AbsPoint x="430" y="256" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="72" />
+                            <AbsPoint x="20" y="98" />
                         </Anchor>
                     </Anchors>
                     <ListData table="DeathReplay_GUI.Listdata"
@@ -106,10 +145,22 @@
                     <Size><AbsPoint x="430" y="256" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="72" />
+                            <AbsPoint x="20" y="98" />
                         </Anchor>
                     </Anchors>
                 </Label>
+
+                <!-- Overview tab content area. Intentionally empty — aggregation
+                     widgets will be added in a follow-up issue. Same footprint
+                     as the Timeline ListBox so layout stays consistent. -->
+                <Window name="$parentOverviewContent">
+                    <Size><AbsPoint x="430" y="256" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="20" y="98" />
+                        </Anchor>
+                    </Anchors>
+                </Window>
 
                 <Button name="$parentPrev" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Anchors>

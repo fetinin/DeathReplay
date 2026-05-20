@@ -31,7 +31,30 @@ local state = {
     currentIndex  = 1,
     sortColumn    = "Time",   -- "Time" | "Amount"
     sortDirection = "desc",   -- "asc" | "desc"
+    currentTab    = 1,        -- 1 = Overview (aggregated, default), 2 = Timeline (per-hit table)
 }
+
+-- Widgets that belong to the Timeline tab. Hidden as a group when the user
+-- switches to the Overview tab. $parentEmptyHint is intentionally NOT here:
+-- Render() owns its visibility based on whether any deaths exist.
+local TIMELINE_WIDGETS = {
+    "DeathReplay_GUITimeline",
+    "DeathReplay_GUISortTime",
+    "DeathReplay_GUIHeaderAbility",
+    "DeathReplay_GUISortDmg",
+}
+
+-- Apply state.currentTab to the visible widgets and pressed-state of the tab
+-- buttons. Called from Render() (populated branch) and OnTabClick().
+local function applyTabVisibility()
+    local onTimeline = (state.currentTab == 2)
+    for _, w in ipairs(TIMELINE_WIDGETS) do
+        WindowSetShowing(w, onTimeline)
+    end
+    WindowSetShowing("DeathReplay_GUIOverviewContent", not onTimeline)
+    ButtonSetPressedFlag("DeathReplay_GUITabsTimeline", onTimeline)
+    ButtonSetPressedFlag("DeathReplay_GUITabsOverview", not onTimeline)
+end
 
 local function deaths()
     return DeathReplay_SavedVariables and DeathReplay_SavedVariables.deaths or {}
@@ -136,6 +159,7 @@ function DeathReplay_GUI.Render()
         WindowSetShowing("DeathReplay_GUISortTime", false)
         WindowSetShowing("DeathReplay_GUIHeaderAbility", false)
         WindowSetShowing("DeathReplay_GUISortDmg",  false)
+        WindowSetShowing("DeathReplay_GUIOverviewContent", false)
         return
     end
     if state.currentIndex < 1 then state.currentIndex = 1 end
@@ -153,10 +177,8 @@ function DeathReplay_GUI.Render()
     LabelSetTextColor("DeathReplay_GUINavLabel", 255, 255, 255)
 
     WindowSetShowing("DeathReplay_GUIEmptyHint", false)
-    WindowSetShowing("DeathReplay_GUITimeline", true)
-    WindowSetShowing("DeathReplay_GUISortTime", true)
-    WindowSetShowing("DeathReplay_GUIHeaderAbility", true)
-    WindowSetShowing("DeathReplay_GUISortDmg",  true)
+    -- Timeline widgets + Overview panel visibility is owned by applyTabVisibility()
+    -- (called at the end of this function) based on state.currentTab.
 
     ButtonSetText("DeathReplay_GUISortTime",      L"Time"   .. arrowFor("Time"))
     ButtonSetText("DeathReplay_GUIHeaderAbility", L"Ability")
@@ -171,6 +193,7 @@ function DeathReplay_GUI.Render()
     end
 
     populateTimeline(d)
+    applyTabVisibility()
 
     -- Mark this death viewed.
     if d.viewed == false then
@@ -189,6 +212,8 @@ function DeathReplay_GUI.Show()
     ButtonSetText("DeathReplay_GUISortTime",      L"Time"   .. arrowFor("Time"))
     ButtonSetText("DeathReplay_GUIHeaderAbility", L"Ability")
     ButtonSetText("DeathReplay_GUISortDmg",       L"Damage" .. arrowFor("Amount"))
+    ButtonSetText("DeathReplay_GUITabsOverview", L"Overview")
+    ButtonSetText("DeathReplay_GUITabsTimeline", L"Timeline")
     DeathReplay_GUI.Render()
 end
 
@@ -231,6 +256,19 @@ function DeathReplay_GUI.OnSortDmg()
     DeathReplay_GUI.Render()
 end
 
+function DeathReplay_GUI.OnTabClick()
+    -- Tab buttons share one handler; id=1 (Overview) vs id=2 (Timeline)
+    -- distinguishes them. WindowGetId reads the id="N" attribute set in XML.
+    local name = SystemData.ActiveWindow.name
+    local id = WindowGetId(name)
+    DeathReplay.DebugPrint(L"DR_DEBUG OnTabClick name=" .. towstring(name)
+                           .. L" id=" .. towstring(id)
+                           .. L" prevTab=" .. towstring(state.currentTab))
+    if id == 0 or id == state.currentTab then return end
+    state.currentTab = id
+    DeathReplay_GUI.Render()
+end
+
 function DeathReplay_GUI.OnClose()
     DeathReplay_GUI.Hide()
 end
@@ -245,4 +283,5 @@ DeathReplay_GUI.OnNext          = dr_safe("OnNext",          DeathReplay_GUI.OnN
 DeathReplay_GUI.OnSortTime      = dr_safe("OnSortTime",      DeathReplay_GUI.OnSortTime)
 DeathReplay_GUI.OnSortDmg       = dr_safe("OnSortDmg",       DeathReplay_GUI.OnSortDmg)
 DeathReplay_GUI.OnRowPopulated  = dr_safe("OnRowPopulated",  DeathReplay_GUI.OnRowPopulated)
+DeathReplay_GUI.OnTabClick      = dr_safe("OnTabClick",      DeathReplay_GUI.OnTabClick)
 DeathReplay_GUI.OnClose         = dr_safe("OnClose",         DeathReplay_GUI.OnClose)

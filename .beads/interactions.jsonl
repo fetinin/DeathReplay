@@ -13,3 +13,5 @@
 {"id":"int-6ea0037a","kind":"field_change","created_at":"2026-05-15T19:27:03.514928Z","actor":"fetinin","issue_id":"DeathReplay-sh8","extra":{"field":"status","new_value":"in_progress","old_value":"open"}}
 {"id":"int-50a8d285","kind":"field_change","created_at":"2026-05-16T13:41:46.372113Z","actor":"fetinin","issue_id":"DeathReplay-sh8","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"completed"}}
 {"id":"int-c12394f6","kind":"field_change","created_at":"2026-05-16T18:59:58.975323Z","actor":"fetinin","issue_id":"DeathReplay-33h","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"completed"}}
+{"id":"int-e605ca54","kind":"field_change","created_at":"2026-05-19T19:34:20.641924Z","actor":"fetinin","issue_id":"DeathReplay-29v","extra":{"field":"status","new_value":"open","old_value":"in_progress"}}
+{"id":"int-857754b8","kind":"field_change","created_at":"2026-05-19T19:34:20.647441Z","actor":"fetinin","issue_id":"DeathReplay-29v","extra":{"field":"priority","new_value":"3","old_value":"2"}}
