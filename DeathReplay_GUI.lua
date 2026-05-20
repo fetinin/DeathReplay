@@ -86,10 +86,11 @@ local function deaths()
     return DeathReplay_SavedVariables and DeathReplay_SavedVariables.deaths or {}
 end
 
--- abilityId=0 means melee auto-attack (no ability id from engine).
+-- abilityId=0 covers both melee and ranged auto-attacks (the engine reports
+-- neither with a discrete ability id), so the label is the broader "Auto-attack".
 local function abilityDisplayName(ability, abilityId)
     if ability ~= nil and ability ~= L"" then return ability end
-    if (abilityId or 0) == 0 then return L"Melee" end
+    if (abilityId or 0) == 0 then return L"Auto-attack" end
     return L"Ability #" .. towstring(abilityId)
 end
 
