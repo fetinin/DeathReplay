@@ -8,10 +8,20 @@ DeathReplay_GUI = {}
 -- comparator.
 DeathReplay_GUI.Listdata = {}
 
+-- Public table read by XML <ListData table="DeathReplay_GUI.OverviewData"...>.
+-- Each entry is one skill row aggregated from the current death's HIT events:
+-- wstring display columns (Skill/Total/Hits/Avg/Max) plus hidden numeric
+-- helpers (_total/_hits/_avg/_max/_name/_maxCrit) used by the sort comparator
+-- and the row populator to colour the Max cell when its peak hit was a crit.
+DeathReplay_GUI.OverviewData = {}
+
 -- Maps visible row index -> Listdata index. Rebuilt by sortListdata() and
 -- handed to ListBoxSetDisplayOrder; engine then exposes it as
 -- _G["DeathReplay_GUITimeline"].PopulatorIndices when populationfunction fires.
 local displayOrder = {}
+
+-- Same role as displayOrder, but for the Overview ListBox.
+local overviewDisplayOrder = {}
 
 -- Diagnostic helper: wrap entry points in pcall + trace for silent error detection.
 local function dr_safe(fn_name, fn)
@@ -27,11 +37,13 @@ local function dr_safe(fn_name, fn)
 end
 
 local state = {
-    visible       = false,
-    currentIndex  = 1,
-    sortColumn    = "Time",   -- "Time" | "Amount"
-    sortDirection = "desc",   -- "asc" | "desc"
-    currentTab    = 1,        -- 1 = Overview (aggregated, default), 2 = Timeline (per-hit table)
+    visible               = false,
+    currentIndex          = 1,
+    sortColumn            = "Time",   -- "Time" | "Amount"
+    sortDirection         = "desc",   -- "asc" | "desc"
+    currentTab            = 1,        -- 1 = Overview (aggregated, default), 2 = Timeline (per-hit table)
+    overviewSortColumn    = "Total",  -- "Skill" | "Total" | "Hits" | "Avg" | "Max"
+    overviewSortDirection = "desc",   -- "asc" | "desc"
 }
 
 -- Widgets that belong to the Timeline tab. Hidden as a group when the user
@@ -44,6 +56,18 @@ local TIMELINE_WIDGETS = {
     "DeathReplay_GUISortDmg",
 }
 
+-- Widgets that belong to the Overview tab. Hidden as a group when the user
+-- switches to the Timeline tab. The OverviewContent panel hosts the ListBox
+-- and is toggled with this group.
+local OVERVIEW_WIDGETS = {
+    "DeathReplay_GUIOverviewContent",
+    "DeathReplay_GUISortSkill",
+    "DeathReplay_GUISortTotal",
+    "DeathReplay_GUISortHits",
+    "DeathReplay_GUISortAvg",
+    "DeathReplay_GUISortMax",
+}
+
 -- Apply state.currentTab to the visible widgets and pressed-state of the tab
 -- buttons. Called from Render() (populated branch) and OnTabClick().
 local function applyTabVisibility()
@@ -51,7 +75,9 @@ local function applyTabVisibility()
     for _, w in ipairs(TIMELINE_WIDGETS) do
         WindowSetShowing(w, onTimeline)
     end
-    WindowSetShowing("DeathReplay_GUIOverviewContent", not onTimeline)
+    for _, w in ipairs(OVERVIEW_WIDGETS) do
+        WindowSetShowing(w, not onTimeline)
+    end
     ButtonSetPressedFlag("DeathReplay_GUITabsTimeline", onTimeline)
     ButtonSetPressedFlag("DeathReplay_GUITabsOverview", not onTimeline)
 end
@@ -88,6 +114,95 @@ local function sortListdata()
             if desc then return ra._dt > rb._dt end
             return ra._dt < rb._dt
         end
+    end)
+end
+
+-- Aggregate a death's HIT events into one row per abilityId. Rebuilds
+-- DeathReplay_GUI.OverviewData in place. Display strings (Skill/Total/Hits/
+-- Avg/Max) are pre-formatted as wstrings so the engine's auto-fill works; the
+-- _total/_hits/_avg/_max/_name/_maxCrit fields drive sortOverview() and
+-- OnOverviewRowPopulated's crit-coloring.
+local function aggregateBySkill(d)
+    DeathReplay_GUI.OverviewData = {}
+    overviewDisplayOrder = {}
+    if d == nil then return end
+    local byId = {}
+    for i = 1, #d.events do
+        local e = d.events[i]
+        if e.kind == "HIT" then
+            local key = e.abilityId or 0
+            local row = byId[key]
+            if row == nil then
+                row = {
+                    name    = abilityDisplayName(e.ability, e.abilityId),
+                    total   = 0, hits = 0, crits = 0,
+                    max     = 0, maxCrit = false,
+                }
+                byId[key] = row
+            end
+            row.total = row.total + (e.amount or 0)
+            row.hits  = row.hits + 1
+            if e.crit then row.crits = row.crits + 1 end
+            if (e.amount or 0) > row.max then
+                row.max     = e.amount or 0
+                row.maxCrit = e.crit and true or false
+            end
+        end
+    end
+    for _, r in pairs(byId) do
+        local avg = (r.hits > 0) and math.floor(r.total / r.hits + 0.5) or 0
+        local maxText = towstring(r.max)
+        if r.maxCrit then maxText = maxText .. L"*" end
+        local hitsText = towstring(r.hits)
+        if r.crits > 0 then hitsText = hitsText .. L" (" .. towstring(r.crits) .. L"*)" end
+        DeathReplay_GUI.OverviewData[#DeathReplay_GUI.OverviewData + 1] = {
+            Skill   = r.name,
+            Total   = towstring(r.total),
+            Hits    = hitsText,
+            Avg     = towstring(avg),
+            Max     = maxText,
+            _name   = r.name,
+            _total  = r.total,
+            _hits   = r.hits,
+            _avg    = avg,
+            _max    = r.max,
+            _maxCrit = r.maxCrit,
+        }
+    end
+end
+
+-- Build overviewDisplayOrder from current sort state. Numeric columns use the
+-- hidden _* fields; the Skill column uses a wstring comparison. Total-desc is
+-- the default tie-break — matches a typical damage-meter expectation that the
+-- biggest contributors float to the top.
+local function sortOverview()
+    overviewDisplayOrder = {}
+    for i = 1, #DeathReplay_GUI.OverviewData do
+        overviewDisplayOrder[i] = i
+    end
+    local col = state.overviewSortColumn
+    local desc = (state.overviewSortDirection == "desc")
+    local data = DeathReplay_GUI.OverviewData
+    table.sort(overviewDisplayOrder, function(a, b)
+        local ra, rb = data[a], data[b]
+        local pa, pb
+        if col == "Skill" then
+            pa, pb = ra._name, rb._name
+        elseif col == "Hits" then
+            pa, pb = ra._hits, rb._hits
+        elseif col == "Avg" then
+            pa, pb = ra._avg, rb._avg
+        elseif col == "Max" then
+            pa, pb = ra._max, rb._max
+        else  -- "Total"
+            pa, pb = ra._total, rb._total
+        end
+        if pa ~= pb then
+            if desc then return pa > pb end
+            return pa < pb
+        end
+        -- tie-break: highest total first, regardless of primary sort direction
+        return ra._total > rb._total
     end)
 end
 
@@ -138,11 +253,46 @@ function DeathReplay_GUI.OnRowPopulated()
     end
 end
 
+function DeathReplay_GUI.OnOverviewRowPopulated()
+    -- Engine flattens $parentList inside $parentOverviewContent to
+    -- DeathReplay_GUIOverviewContentList, and instantiates row windows under
+    -- it as ...ListRow1, ...ListRow2, ... matching the Overview row template.
+    local list = _G["DeathReplay_GUIOverviewContentList"]
+    if list == nil or list.PopulatorIndices == nil then return end
+    for k, dataIndex in ipairs(list.PopulatorIndices) do
+        local row = DeathReplay_GUI.OverviewData[dataIndex]
+        if row ~= nil then
+            local rowName = "DeathReplay_GUIOverviewContentListRow" .. k
+            LabelSetTextColor(rowName .. "Skill", 255, 255, 255)
+            LabelSetTextColor(rowName .. "Total", 255,  80,  80)
+            LabelSetTextColor(rowName .. "Hits",  220, 220, 220)
+            LabelSetTextColor(rowName .. "Avg",   220, 220, 220)
+            -- When the row's peak hit was a crit, colour Max yellow (matches
+            -- the Timeline Flags column's CRIT/*KB* highlight) instead of the
+            -- normal red so the marker pops at a glance.
+            if row._maxCrit then
+                LabelSetTextColor(rowName .. "Max", 255, 220,  80)
+            else
+                LabelSetTextColor(rowName .. "Max", 255,  80,  80)
+            end
+        end
+    end
+end
+
 local function arrowFor(col)
     if state.sortColumn ~= col then return L"" end
     if state.sortDirection == "desc" then return L" v" end
     return L" ^"
 end
+
+local function arrowForOverview(col)
+    if state.overviewSortColumn ~= col then return L"" end
+    if state.overviewSortDirection == "desc" then return L" v" end
+    return L" ^"
+end
+
+-- Maps Overview header button id (XML id="N") to the sort column key.
+local OVERVIEW_SORT_COLS = { [1] = "Skill", [2] = "Total", [3] = "Hits", [4] = "Avg", [5] = "Max" }
 
 function DeathReplay_GUI.Render()
     local list = deaths()
@@ -159,7 +309,9 @@ function DeathReplay_GUI.Render()
         WindowSetShowing("DeathReplay_GUISortTime", false)
         WindowSetShowing("DeathReplay_GUIHeaderAbility", false)
         WindowSetShowing("DeathReplay_GUISortDmg",  false)
-        WindowSetShowing("DeathReplay_GUIOverviewContent", false)
+        for _, w in ipairs(OVERVIEW_WIDGETS) do
+            WindowSetShowing(w, false)
+        end
         return
     end
     if state.currentIndex < 1 then state.currentIndex = 1 end
@@ -183,8 +335,18 @@ function DeathReplay_GUI.Render()
     ButtonSetText("DeathReplay_GUISortTime",      L"Time"   .. arrowFor("Time"))
     ButtonSetText("DeathReplay_GUIHeaderAbility", L"Ability")
     ButtonSetText("DeathReplay_GUISortDmg",       L"Damage" .. arrowFor("Amount"))
+    ButtonSetText("DeathReplay_GUISortSkill",     L"Skill"  .. arrowForOverview("Skill"))
+    ButtonSetText("DeathReplay_GUISortTotal",     L"Total"  .. arrowForOverview("Total"))
+    ButtonSetText("DeathReplay_GUISortHits",      L"Hits"   .. arrowForOverview("Hits"))
+    ButtonSetText("DeathReplay_GUISortAvg",       L"Avg"    .. arrowForOverview("Avg"))
+    ButtonSetText("DeathReplay_GUISortMax",       L"Max"    .. arrowForOverview("Max"))
     if Button and Button.ButtonState then
-        for _, btn in ipairs({"DeathReplay_GUISortTime", "DeathReplay_GUIHeaderAbility", "DeathReplay_GUISortDmg"}) do
+        local headers = {
+            "DeathReplay_GUISortTime", "DeathReplay_GUIHeaderAbility", "DeathReplay_GUISortDmg",
+            "DeathReplay_GUISortSkill", "DeathReplay_GUISortTotal", "DeathReplay_GUISortHits",
+            "DeathReplay_GUISortAvg",  "DeathReplay_GUISortMax",
+        }
+        for _, btn in ipairs(headers) do
             ButtonSetTextColor(btn, Button.ButtonState.NORMAL,              255, 220,  80)
             ButtonSetTextColor(btn, Button.ButtonState.HIGHLIGHTED,         255, 255, 255)
             ButtonSetTextColor(btn, Button.ButtonState.PRESSED,             255, 255, 255)
@@ -193,6 +355,9 @@ function DeathReplay_GUI.Render()
     end
 
     populateTimeline(d)
+    aggregateBySkill(d)
+    sortOverview()
+    ListBoxSetDisplayOrder("DeathReplay_GUIOverviewContentList", overviewDisplayOrder)
     applyTabVisibility()
 
     -- Mark this death viewed.
@@ -212,6 +377,11 @@ function DeathReplay_GUI.Show()
     ButtonSetText("DeathReplay_GUISortTime",      L"Time"   .. arrowFor("Time"))
     ButtonSetText("DeathReplay_GUIHeaderAbility", L"Ability")
     ButtonSetText("DeathReplay_GUISortDmg",       L"Damage" .. arrowFor("Amount"))
+    ButtonSetText("DeathReplay_GUISortSkill",     L"Skill"  .. arrowForOverview("Skill"))
+    ButtonSetText("DeathReplay_GUISortTotal",     L"Total"  .. arrowForOverview("Total"))
+    ButtonSetText("DeathReplay_GUISortHits",      L"Hits"   .. arrowForOverview("Hits"))
+    ButtonSetText("DeathReplay_GUISortAvg",       L"Avg"    .. arrowForOverview("Avg"))
+    ButtonSetText("DeathReplay_GUISortMax",       L"Max"    .. arrowForOverview("Max"))
     ButtonSetText("DeathReplay_GUITabsOverview", L"Overview")
     ButtonSetText("DeathReplay_GUITabsTimeline", L"Timeline")
     DeathReplay_GUI.Render()
@@ -256,6 +426,23 @@ function DeathReplay_GUI.OnSortDmg()
     DeathReplay_GUI.Render()
 end
 
+function DeathReplay_GUI.OnOverviewSort()
+    -- Five Overview headers share one handler; id=1..5 picks the column via
+    -- OVERVIEW_SORT_COLS. Same id-dispatch idiom as OnTabClick above.
+    local name = SystemData.ActiveWindow.name
+    local id = WindowGetId(name)
+    local col = OVERVIEW_SORT_COLS[id]
+    if col == nil then return end
+    if state.overviewSortColumn == col then
+        state.overviewSortDirection = (state.overviewSortDirection == "desc") and "asc" or "desc"
+    else
+        state.overviewSortColumn    = col
+        -- Skill defaults to ascending (alphabetical), numeric columns to desc.
+        state.overviewSortDirection = (col == "Skill") and "asc" or "desc"
+    end
+    DeathReplay_GUI.Render()
+end
+
 function DeathReplay_GUI.OnTabClick()
     -- Tab buttons share one handler; id=1 (Overview) vs id=2 (Timeline)
     -- distinguishes them. WindowGetId reads the id="N" attribute set in XML.
@@ -283,5 +470,7 @@ DeathReplay_GUI.OnNext          = dr_safe("OnNext",          DeathReplay_GUI.OnN
 DeathReplay_GUI.OnSortTime      = dr_safe("OnSortTime",      DeathReplay_GUI.OnSortTime)
 DeathReplay_GUI.OnSortDmg       = dr_safe("OnSortDmg",       DeathReplay_GUI.OnSortDmg)
 DeathReplay_GUI.OnRowPopulated  = dr_safe("OnRowPopulated",  DeathReplay_GUI.OnRowPopulated)
+DeathReplay_GUI.OnOverviewRowPopulated = dr_safe("OnOverviewRowPopulated", DeathReplay_GUI.OnOverviewRowPopulated)
+DeathReplay_GUI.OnOverviewSort  = dr_safe("OnOverviewSort",  DeathReplay_GUI.OnOverviewSort)
 DeathReplay_GUI.OnTabClick      = dr_safe("OnTabClick",      DeathReplay_GUI.OnTabClick)
 DeathReplay_GUI.OnClose         = dr_safe("OnClose",         DeathReplay_GUI.OnClose)
