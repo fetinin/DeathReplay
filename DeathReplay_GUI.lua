@@ -321,10 +321,17 @@ function DeathReplay_GUI.Render()
         for _, w in ipairs(OVERVIEW_WIDGETS) do
             WindowSetShowing(w, false)
         end
+        ButtonSetDisabledFlag("DeathReplay_GUIPrev", true)
+        ButtonSetDisabledFlag("DeathReplay_GUINext", true)
         return
     end
     if state.currentIndex < 1 then state.currentIndex = 1 end
     if state.currentIndex > #list then state.currentIndex = #list end
+    -- Prev walks toward the newest (lower index); Next walks toward older
+    -- (higher index). Disable each at the corresponding boundary so the
+    -- handler can't push currentIndex out of range.
+    ButtonSetDisabledFlag("DeathReplay_GUIPrev", state.currentIndex <= 1)
+    ButtonSetDisabledFlag("DeathReplay_GUINext", state.currentIndex >= #list)
     local d = list[state.currentIndex]
     local kbName = L"unknown"
     if d.killingBlow then
