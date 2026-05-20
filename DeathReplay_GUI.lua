@@ -152,10 +152,11 @@ local function aggregateBySkill(d)
     end
     for _, r in pairs(byId) do
         local avg = (r.hits > 0) and math.floor(r.total / r.hits + 0.5) or 0
+        -- Max stays a plain number; crit-ness is communicated in
+        -- OnOverviewRowPopulated by swapping the cell's font to bold.
         local maxText = towstring(r.max)
-        if r.maxCrit then maxText = maxText .. L"*" end
         local hitsText = towstring(r.hits)
-        if r.crits > 0 then hitsText = hitsText .. L" (" .. towstring(r.crits) .. L"*)" end
+        if r.crits > 0 then hitsText = hitsText .. L" (" .. towstring(r.crits) .. L" CRIT)" end
         DeathReplay_GUI.OverviewData[#DeathReplay_GUI.OverviewData + 1] = {
             Skill   = r.name,
             Total   = towstring(r.total),
@@ -270,13 +271,18 @@ function DeathReplay_GUI.OnOverviewRowPopulated()
             LabelSetTextColor(rowName .. "Total", 255,  80,  80)
             LabelSetTextColor(rowName .. "Hits",  220, 220, 220)
             LabelSetTextColor(rowName .. "Avg",   220, 220, 220)
-            -- When the row's peak hit was a crit, colour Max yellow (matches
-            -- the Timeline Flags column's CRIT/*KB* highlight) instead of the
-            -- normal red so the marker pops at a glance.
+            LabelSetTextColor(rowName .. "Max",   255,  80,  80)
+            -- Crit marker on the peak hit: swap Max font to a bold variant.
+            -- font_clear_small_bold is the bold pair other RoR addons use
+            -- (Warbuilder); font_chat_text_bold appears registered but is
+            -- visually identical to font_chat_text in this client.
+            -- Note: LabelSetFont silently no-ops without the linespacing
+            -- argument — every working call in the codebase passes it
+            -- (PotionBar, wsct, Enemy, Obsidian).
             if row._maxCrit then
-                LabelSetTextColor(rowName .. "Max", 255, 220,  80)
+                LabelSetFont(rowName .. "Max", "font_clear_small_bold", WindowUtils.FONT_DEFAULT_TEXT_LINESPACING)
             else
-                LabelSetTextColor(rowName .. "Max", 255,  80,  80)
+                LabelSetFont(rowName .. "Max", "font_chat_text", WindowUtils.FONT_DEFAULT_TEXT_LINESPACING)
             end
         end
     end
