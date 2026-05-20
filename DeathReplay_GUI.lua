@@ -214,9 +214,11 @@ local function populateTimeline(d)
     for i = 1, #d.events do
         local e = d.events[i]
         if e.kind == "HIT" then
-            -- %7.3f keeps millisecond precision and a consistent column width
-            -- for "-10.000" through "  0.000" (GetGameTime returns seconds).
-            local dtText = towstring(string.format("%7.3fs", e.dt))
+            -- Whole-second resolution is enough for at-a-glance replay; the
+            -- millisecond precision the engine reports was noise on screen.
+            -- %3.0f rounds to nearest integer and keeps width consistent for
+            -- "-10s" through "  0s" (GetGameTime returns seconds).
+            local dtText = towstring(string.format("%3.0fs", e.dt))
             -- Leading space separates the flag text from the right-aligned
             -- Amount column that visually butts up against the Flags column.
             local flags = L""
