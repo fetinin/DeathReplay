@@ -78,6 +78,10 @@ local recentEvents          = {}   -- chronological, oldest first; each entry ha
 -- damage abilities never appear. Runtime-only (not persisted).
 local iconCache       = {}
 local iconCacheByName = {}
+-- Maintained counters so the DR_BUFF debug line doesn't need an O(n) `pairs`
+-- walk on every PLAYER_EFFECTS_UPDATED. Increment-on-first-insert only.
+local iconCacheSize       = 0
+local iconCacheByNameSize = 0
 
 local effectFieldDumpDone = false
 local function harvestIconsFromActiveEffects()
@@ -98,10 +102,16 @@ local function harvestIconsFromActiveEffects()
         if firstE == nil then firstE = e end
         if e.iconNum and e.iconNum > 0 then
             if e.abilityId then
-                if iconCache[e.abilityId] == nil then added = added + 1 end
+                if iconCache[e.abilityId] == nil then
+                    added = added + 1
+                    iconCacheSize = iconCacheSize + 1
+                end
                 iconCache[e.abilityId] = e.iconNum
             end
             if e.name and e.name ~= L"" then
+                if iconCacheByName[e.name] == nil then
+                    iconCacheByNameSize = iconCacheByNameSize + 1
+                end
                 iconCacheByName[e.name] = e.iconNum
             end
         end
@@ -117,10 +127,10 @@ local function harvestIconsFromActiveEffects()
         EA_ChatWindow.Print(L"DR_BUFF first-effect keys:" .. keys)
     end
     if DeathReplay.IsDebug() and (seen > 0 or added > 0) then
-        local n = 0; for _ in pairs(iconCache) do n = n + 1 end
         EA_ChatWindow.Print(L"DR_BUFF harvest seen=" .. towstring(seen)
             .. L" added=" .. towstring(added)
-            .. L" cacheSize=" .. towstring(n))
+            .. L" cacheSize=" .. towstring(iconCacheSize)
+            .. L" byName=" .. towstring(iconCacheByNameSize))
     end
 end
 
@@ -311,17 +321,6 @@ local function pushEvent(entry)
 end
 
 function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
-    -- DIAGNOSTIC: print before every gate to find which gate is dropping the
-    -- player's incoming hits. Filter to events where the player is defender so
-    -- we don't drown the chat in every world combat event.
-    if DeathReplay.IsDebug() and isDefenderPlayer(objectID) then
-        EA_ChatWindow.Print(L"DR_CE aid=" .. towstring(abilityID)
-            .. L" amt=" .. towstring(amount)
-            .. L" ev=" .. towstring(combatEvent)
-            .. L" pvp=" .. (isPvpNow and L"Y" or L"N")
-            .. L" inScen=" .. towstring(tostring(GameData.Player.isInScenario))
-            .. L" zone=" .. towstring(GameData.Player.zone or "nil"))
-    end
     if not isPvpNow then return end
     if not isDefenderPlayer(objectID) then return end
     local mapping = COMBAT_EVENT_KIND[combatEvent]
