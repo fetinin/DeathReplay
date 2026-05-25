@@ -6,7 +6,7 @@
     <Windows>
         <Window name="DeathReplay_GUI" movable="true" handleinput="true" savesettings="true" layer="popup">
             <Size>
-                <AbsPoint x="480" y="420" />
+                <AbsPoint x="480" y="446" />
             </Size>
             <Anchors>
                 <Anchor point="center" relativePoint="center" relativeTo="">
@@ -37,11 +37,50 @@
                     <Size><AbsPoint x="0" y="56" /></Size>
                 </Window>
 
+                <!-- Tab strip: switches main content between the aggregated Overview
+                     (default, opened first) and the per-hit Timeline view. Both
+                     buttons fire OnTabClick and are distinguished by the id attribute
+                     (1 = Overview, 2 = Timeline). EA_Button_ListSort is used (same widget as the
+                     column headers below) so the buttons sit IN the window rather
+                     than hanging above the title bar like EA_Button_Tab does. -->
+                <Window name="$parentTabs">
+                    <Size><AbsPoint x="220" y="30" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="20" y="6" />
+                        </Anchor>
+                    </Anchors>
+                    <Windows>
+                        <Button name="$parentOverview" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup" id="1">
+                            <Size><AbsPoint x="100" y="28" /></Size>
+                            <Anchors>
+                                <Anchor point="topleft" relativePoint="topleft" relativeTo="">
+                                    <AbsPoint x="0" y="0" />
+                                </Anchor>
+                            </Anchors>
+                            <EventHandlers>
+                                <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnTabClick"/>
+                            </EventHandlers>
+                        </Button>
+                        <Button name="$parentTimeline" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup" id="2">
+                            <Size><AbsPoint x="100" y="28" /></Size>
+                            <Anchors>
+                                <Anchor point="topleft" relativePoint="topleft" relativeTo="">
+                                    <AbsPoint x="110" y="0" />
+                                </Anchor>
+                            </Anchors>
+                            <EventHandlers>
+                                <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnTabClick"/>
+                            </EventHandlers>
+                        </Button>
+                    </Windows>
+                </Window>
+
                 <Label name="$parentNavLabel" font="font_default_text" inherits="DefaultWindowText" handleinput="false" textalign="left" wordwrap="false">
                     <Size><AbsPoint x="440" y="20" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="14" />
+                            <AbsPoint x="20" y="40" />
                         </Anchor>
                     </Anchors>
                 </Label>
@@ -50,7 +89,7 @@
                     <Size><AbsPoint x="80" y="30" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="36" />
+                            <AbsPoint x="20" y="62" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
@@ -64,7 +103,7 @@
                     <Size><AbsPoint x="230" y="30" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="100" y="36" />
+                            <AbsPoint x="100" y="62" />
                         </Anchor>
                     </Anchors>
                 </Button>
@@ -73,7 +112,7 @@
                     <Size><AbsPoint x="100" y="30" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="330" y="36" />
+                            <AbsPoint x="330" y="62" />
                         </Anchor>
                     </Anchors>
                     <EventHandlers>
@@ -81,14 +120,86 @@
                     </EventHandlers>
                 </Button>
 
+                <!-- Overview-tab column headers. Live at the same y=62 strip as the
+                     Timeline headers above and are swapped in/out by applyTabVisibility().
+                     All five share OnOverviewSort; the id attribute (1..5) identifies
+                     which column was clicked. Widths sum to 430 px (the panel width). -->
+                <Button name="$parentSortSkill" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup" id="1">
+                    <Size><AbsPoint x="140" y="30" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="20" y="62" />
+                        </Anchor>
+                    </Anchors>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnOverviewSort"/>
+                    </EventHandlers>
+                </Button>
+
+                <Button name="$parentSortTotal" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup" id="2">
+                    <Size><AbsPoint x="70" y="30" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="160" y="62" />
+                        </Anchor>
+                    </Anchors>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnOverviewSort"/>
+                    </EventHandlers>
+                </Button>
+
+                <Button name="$parentSortHits" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup" id="3">
+                    <Size><AbsPoint x="80" y="30" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="230" y="62" />
+                        </Anchor>
+                    </Anchors>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnOverviewSort"/>
+                    </EventHandlers>
+                </Button>
+
+                <Button name="$parentSortAvg" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup" id="4">
+                    <Size><AbsPoint x="60" y="30" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="310" y="62" />
+                        </Anchor>
+                    </Anchors>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnOverviewSort"/>
+                    </EventHandlers>
+                </Button>
+
+                <!-- Max header is narrower than the others so it ends at bg x=430,
+                     leaving ~16 px clear for the ListBox's vertical scrollbar
+                     (which lives at the right edge of $parentTimeline/$parentList,
+                     bg ~x=430 to x=450). Matches the Timeline tab's Damage header. -->
+                <Button name="$parentSortMax" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup" id="5">
+                    <Size><AbsPoint x="60" y="30" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="370" y="62" />
+                        </Anchor>
+                    </Anchors>
+                    <EventHandlers>
+                        <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnOverviewSort"/>
+                    </EventHandlers>
+                </Button>
+
+                <!-- Width 440 / height 232 matches the Overview ListBox so the
+                     scrollbar lands clear of the Damage column (ends at bg
+                     x=430) and the bottom pulley sits above the footer at bg
+                     y=358. Rows themselves are 410 wide (template unchanged). -->
                 <ListBox name="$parentTimeline"
                          scrollbar="EA_ScrollBar_DefaultVerticalChain"
                          rowdef="DeathReplay_GUI_TimelineRow"
-                         visiblerows="11" rowcount="200" rowspacing="0">
-                    <Size><AbsPoint x="430" y="256" /></Size>
+                         visiblerows="10" rowcount="200" rowspacing="0">
+                    <Size><AbsPoint x="440" y="232" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="72" />
+                            <AbsPoint x="20" y="98" />
                         </Anchor>
                     </Anchors>
                     <ListData table="DeathReplay_GUI.Listdata"
@@ -106,10 +217,53 @@
                     <Size><AbsPoint x="430" y="256" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
-                            <AbsPoint x="20" y="72" />
+                            <AbsPoint x="20" y="98" />
                         </Anchor>
                     </Anchors>
                 </Label>
+
+                <!-- Overview tab content area. Same top y=98 as the Timeline
+                     ListBox (any higher and the EA_Button_ListSort header
+                     texture, which renders past its declared 30 px height,
+                     clips the first row). +10 px wider than Timeline so the
+                     auto-positioned scrollbar lands clear of the Max column
+                     (which ends at bg x=430). Height 232 (vs Timeline's 256)
+                     because EA_ScrollBar_DefaultVerticalChain's bottom pulley
+                     texture renders past the ListBox bottom edge — the shorter
+                     box keeps that pulley clear of the footer at bg y=358.
+                     Rows stay 410 wide so the visible data area still matches
+                     the headers. -->
+                <Window name="$parentOverviewContent">
+                    <Size><AbsPoint x="440" y="232" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentBackground">
+                            <AbsPoint x="20" y="98" />
+                        </Anchor>
+                    </Anchors>
+                    <Windows>
+                        <ListBox name="$parentList"
+                                 scrollbar="EA_ScrollBar_DefaultVerticalChain"
+                                 rowdef="DeathReplay_GUI_OverviewRow"
+                                 visiblerows="10" rowcount="200" rowspacing="0">
+                            <Size><AbsPoint x="440" y="232" /></Size>
+                            <Anchors>
+                                <Anchor point="topleft" relativePoint="topleft" relativeTo="$parentOverviewContent">
+                                    <AbsPoint x="0" y="0" />
+                                </Anchor>
+                            </Anchors>
+                            <ListData table="DeathReplay_GUI.OverviewData"
+                                      populationfunction="DeathReplay_GUI.OnOverviewRowPopulated">
+                                <ListColumns>
+                                    <ListColumn windowname="Skill" variable="Skill" format="wstring"/>
+                                    <ListColumn windowname="Total" variable="Total" format="wstring"/>
+                                    <ListColumn windowname="Hits"  variable="Hits"  format="wstring"/>
+                                    <ListColumn windowname="Avg"   variable="Avg"   format="wstring"/>
+                                    <ListColumn windowname="Max"   variable="Max"   format="wstring"/>
+                                </ListColumns>
+                            </ListData>
+                        </ListBox>
+                    </Windows>
+                </Window>
 
                 <Button name="$parentPrev" inherits="EA_Button_DefaultResizeable" layer="popup">
                     <Anchors>
@@ -182,6 +336,59 @@
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft">
                             <AbsPoint x="360" y="0" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+            </Windows>
+        </Window>
+
+        <!-- Row template for the Overview ListBox. Engine instantiates copies
+             named DeathReplay_GUIOverviewContentListRow1, ...Row2, ... with
+             child labels matching the windowname attrs on the ListColumns above
+             ($parentSkill, $parentTotal, $parentHits, $parentAvg, $parentMax).
+             Cell widths/offsets line up with the column headers at y=62. -->
+        <!-- Row width 410 (not 430) leaves space for the ListBox scrollbar at
+             the right edge, matching DeathReplay_GUI_TimelineRow's footprint. -->
+        <Window name="DeathReplay_GUI_OverviewRow">
+            <Size><AbsPoint x="410" y="22" /></Size>
+            <Windows>
+                <Label name="$parentSkill" textalign="left" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="140" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="0" y="0" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+                <Label name="$parentTotal" textalign="right" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="70" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="140" y="0" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+                <Label name="$parentHits" textalign="center" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="80" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="210" y="0" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+                <Label name="$parentAvg" textalign="right" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="60" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="290" y="0" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+                <Label name="$parentMax" textalign="right" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="60" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="350" y="0" />
                         </Anchor>
                     </Anchors>
                 </Label>
