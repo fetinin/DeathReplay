@@ -39,6 +39,7 @@
         <Dependencies>
             <Dependency name="LibSlash" />
             <Dependency name="EATemplate_DefaultWindowSkin" />
+            <Dependency name="Warbuilder" optional="false" forceEnable="true" />
         </Dependencies>
         <Files>
             <File name="DeathReplay.lua" />

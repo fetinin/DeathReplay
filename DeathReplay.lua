@@ -83,6 +83,12 @@ local iconCacheByName = {}
 local iconCacheSize       = 0
 local iconCacheByNameSize = 0
 
+-- abilityID -> iconNum, harvested once at init from Warbuilder.Career[].
+-- Covers direct-hit abilities (no debuff aura) that the runtime iconCache
+-- never sees. ~1850 entries across all 24 PvP careers. Hard-dep on Warbuilder
+-- declared in DeathReplay.mod so the table is guaranteed populated at init.
+local staticAbilityIconDB = {}
+
 local effectFieldDumpDone = false
 local function harvestIconsFromActiveEffects()
     local effects = GetBuffs(GameData.BuffTargetType.SELF)
@@ -134,6 +140,40 @@ local function harvestIconsFromActiveEffects()
     end
 end
 
+local function buildStaticAbilityIconDB()
+    if not Warbuilder or not Warbuilder.Career then return end
+    local count = 0
+    local function ingest(e)
+        if e and e.ID and e.Icon and e.Icon > 0 and staticAbilityIconDB[e.ID] == nil then
+            staticAbilityIconDB[e.ID] = e.Icon
+            count = count + 1
+        end
+    end
+    for _, career in pairs(Warbuilder.Career) do
+        if career.Core then
+            -- Core.Ability / Core.Tactic / Core.Morale are flat arrays.
+            for _, list in pairs({career.Core.Ability, career.Core.Tactic, career.Core.Morale}) do
+                for _, e in ipairs(list) do ingest(e) end
+            end
+        end
+        if career.Path then
+            -- Each Path[i] is a hybrid table: a named .Core sub-table holding
+            -- the mastery path's tree abilities (plus a decorative .Icon field
+            -- that ipairs skips), and array entries at the path level for
+            -- mastery tactics/morales. ipairs iterates only numeric keys.
+            for _, path in ipairs(career.Path) do
+                if path.Core then
+                    for _, e in ipairs(path.Core) do ingest(e) end
+                end
+                for _, e in ipairs(path) do ingest(e) end
+            end
+        end
+    end
+    if DeathReplay.IsDebug() then
+        EA_ChatWindow.Print(L"DR_INIT staticAbilityIconDB built, entries=" .. towstring(count))
+    end
+end
+
 local function resolveIconForAbility(abilityID, abilityName)
     -- Player's own outgoing abilities resolve here (cheap, authoritative).
     -- For most DeathReplay events (incoming damage) this path returns iconNum=0
@@ -150,7 +190,16 @@ local function resolveIconForAbility(abilityID, abilityName)
     -- effect.abilityId (e.g. Touch of Palsy cast=8338, tick=3400, name="Touch
     -- of Palsy^n" on both).
     if abilityName and abilityName ~= L"" then
-        return iconCacheByName[abilityName]
+        local byName = iconCacheByName[abilityName]
+        if byName then return byName end
+    end
+    -- Static DB fallback: covers direct-hit abilities the runtime caches never
+    -- see (no debuff aura applied to the player). Sourced from
+    -- Warbuilder.Career[] at addon init. Holds cast-time ability IDs only, so
+    -- it deliberately sits after the runtime name cache that catches DoT tick
+    -- IDs.
+    if abilityID and abilityID > 0 then
+        return staticAbilityIconDB[abilityID]
     end
     return nil
 end
@@ -415,6 +464,9 @@ function DeathReplay.OnInitialize()
         -- Seed iconCache with whatever's currently active so a hit that lands
         -- before the first PLAYER_EFFECTS_UPDATED still has a chance to resolve.
         harvestIconsFromActiveEffects()
+        -- One-shot ingest of Warbuilder's static ability database so direct-hit
+        -- abilities (no debuff aura) resolve to icons too.
+        buildStaticAbilityIconDB()
 
         -- Seed isPvpNow from current GameData. None of the context-change
         -- events refire on /reloadui mid-scenario, so without this seed the
