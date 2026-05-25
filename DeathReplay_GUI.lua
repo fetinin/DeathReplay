@@ -118,28 +118,32 @@ local function sortListdata()
     end)
 end
 
--- Aggregate a death's HIT events into one row per abilityId. Rebuilds
+-- Aggregate a death's HIT events into one row per display-name. Keyed by name
+-- (not abilityId) so DoT ticks merge with their parent cast even though the
+-- engine fires them with different abilityIds (verified: Touch of Palsy
+-- cast=8338, tick=3400, same name "Touch of Palsy^n"). Rebuilds
 -- DeathReplay_GUI.OverviewData in place. Display strings (Skill/Total/Hits/
 -- Avg/Max) are pre-formatted as wstrings so the engine's auto-fill works; the
--- _total/_hits/_avg/_max/_name/_maxCrit fields drive sortOverview() and
--- OnOverviewRowPopulated's crit-coloring.
+-- _total/_hits/_avg/_max/_name/_maxCrit/_iconNum fields drive sortOverview(),
+-- OnOverviewRowPopulated's crit-coloring, and the icon column.
 local function aggregateBySkill(d)
     DeathReplay_GUI.OverviewData = {}
     overviewDisplayOrder = {}
     if d == nil then return end
-    local byId = {}
+    local byName = {}
     for i = 1, #d.events do
         local e = d.events[i]
         if e.kind == "HIT" then
-            local key = e.abilityId or 0
-            local row = byId[key]
+            local key = abilityDisplayName(e.ability, e.abilityId)
+            local row = byName[key]
             if row == nil then
                 row = {
-                    name    = abilityDisplayName(e.ability, e.abilityId),
+                    name    = key,
                     total   = 0, hits = 0, crits = 0,
                     max     = 0, maxCrit = false,
+                    iconNum = nil,
                 }
-                byId[key] = row
+                byName[key] = row
             end
             row.total = row.total + (e.amount or 0)
             row.hits  = row.hits + 1
@@ -148,9 +152,14 @@ local function aggregateBySkill(d)
                 row.max     = e.amount or 0
                 row.maxCrit = e.crit and true or false
             end
+            -- Take the first non-zero iconNum we see for this name. Different
+            -- abilityIds with the same name (cast + ticks) share the same icon.
+            if row.iconNum == nil and e.iconNum and e.iconNum > 0 then
+                row.iconNum = e.iconNum
+            end
         end
     end
-    for _, r in pairs(byId) do
+    for _, r in pairs(byName) do
         local avg = (r.hits > 0) and math.floor(r.total / r.hits + 0.5) or 0
         -- Max stays a plain number; crit-ness is communicated in
         -- OnOverviewRowPopulated by swapping the cell's font to bold.
@@ -163,12 +172,13 @@ local function aggregateBySkill(d)
             Hits    = hitsText,
             Avg     = towstring(avg),
             Max     = maxText,
-            _name   = r.name,
-            _total  = r.total,
-            _hits   = r.hits,
-            _avg    = avg,
-            _max    = r.max,
+            _name    = r.name,
+            _total   = r.total,
+            _hits    = r.hits,
+            _avg     = avg,
+            _max     = r.max,
             _maxCrit = r.maxCrit,
+            _iconNum = r.iconNum,
         }
     end
 end
@@ -229,12 +239,13 @@ local function populateTimeline(d)
                 else flags = flags .. L" *KB*" end
             end
             table.insert(DeathReplay_GUI.Listdata, {
-                Time    = dtText,
-                Name    = abilityDisplayName(e.ability, e.abilityId),
-                Amount  = towstring(e.amount or 0),
-                Flags   = flags,
-                _dt     = e.dt or 0,
-                _amount = e.amount or 0,
+                Time     = dtText,
+                Name     = abilityDisplayName(e.ability, e.abilityId),
+                Amount   = towstring(e.amount or 0),
+                Flags    = flags,
+                _dt      = e.dt or 0,
+                _amount  = e.amount or 0,
+                _iconNum = e.iconNum,   -- captured at hit-time; nil for cache misses / pre-feature deaths
             })
         end
     end
@@ -253,6 +264,26 @@ function DeathReplay_GUI.OnRowPopulated()
             LabelSetTextColor(rowName .. "Name",   255, 255, 255)
             LabelSetTextColor(rowName .. "Amount", 255,  80,  80)
             LabelSetTextColor(rowName .. "Flags",  255, 220,  80)
+
+            -- Icon column: render only if we captured an iconNum at hit-time
+            -- (via DeathReplay.lua's GetBuffs(SELF) harvest). Otherwise hide the
+            -- slot so recycled rows don't show a stale texture from another row.
+            local iconName = rowName .. "Icon"
+            local iconNum = row._iconNum
+            if iconNum and iconNum > 0 then
+                local tex, ix, iy = GetIconData(iconNum)
+                if tex and tex ~= "" and tex ~= "icon000000" then
+                    -- Scale comes from textureScale in XML; runtime tweaks only
+                    -- set the source rect + texture. Match PotionBar's pattern.
+                    DynamicImageSetTextureDimensions(iconName, ix, iy)
+                    DynamicImageSetTexture(iconName, tex, ix, iy)
+                    WindowSetShowing(iconName, true)
+                else
+                    WindowSetShowing(iconName, false)
+                end
+            else
+                WindowSetShowing(iconName, false)
+            end
         end
     end
 end
@@ -283,6 +314,25 @@ function DeathReplay_GUI.OnOverviewRowPopulated()
                 LabelSetFont(rowName .. "Max", "font_clear_small_bold", WindowUtils.FONT_DEFAULT_TEXT_LINESPACING)
             else
                 LabelSetFont(rowName .. "Max", "font_chat_text", WindowUtils.FONT_DEFAULT_TEXT_LINESPACING)
+            end
+
+            -- Icon column: same scheme as the Timeline row populator. Hide
+            -- the slot when no iconNum was captured for this skill (Auto-
+            -- attacks, direct-damage abilities, abilities whose only hit
+            -- arrived before the buff harvest had seen them).
+            local iconName = rowName .. "Icon"
+            local iconNum = row._iconNum
+            if iconNum and iconNum > 0 then
+                local tex, ix, iy = GetIconData(iconNum)
+                if tex and tex ~= "" and tex ~= "icon000000" then
+                    DynamicImageSetTextureDimensions(iconName, ix, iy)
+                    DynamicImageSetTexture(iconName, tex, ix, iy)
+                    WindowSetShowing(iconName, true)
+                else
+                    WindowSetShowing(iconName, false)
+                end
+            else
+                WindowSetShowing(iconName, false)
             end
         end
     end

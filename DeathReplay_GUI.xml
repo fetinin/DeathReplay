@@ -306,11 +306,23 @@
                         </Anchor>
                     </Anchors>
                 </Label>
-                <Label name="$parentName" textalign="left" font="font_chat_text" warnOnTextCropped="false">
-                    <Size><AbsPoint x="224" y="22" /></Size>
+                <!-- textureScale 22/64 = 0.34375. Engine ability icons are
+                     64x64 native; runtime DynamicImageSetTextureScale did not
+                     stick, so the scale is anchored statically (PotionBar pattern). -->
+                <DynamicImage name="$parentIcon" handleinput="false" textureScale="0.34375">
+                    <Size><AbsPoint x="22" y="22" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft">
-                            <AbsPoint x="76" y="0" />
+                            <AbsPoint x="80" y="0" />
+                        </Anchor>
+                    </Anchors>
+                    <TexDims x="64" y="64"/>
+                </DynamicImage>
+                <Label name="$parentName" textalign="left" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="194" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="106" y="0" />
                         </Anchor>
                     </Anchors>
                 </Label>
@@ -343,11 +355,24 @@
         <Window name="DeathReplay_GUI_OverviewRow">
             <Size><AbsPoint x="410" y="22" /></Size>
             <Windows>
-                <Label name="$parentSkill" textalign="left" font="font_chat_text" warnOnTextCropped="false">
-                    <Size><AbsPoint x="140" y="22" /></Size>
+                <!-- Icon column on the Overview row, same widget pattern and
+                     22/64=0.34375 textureScale as the Timeline row template
+                     above. Skill label is shifted right by 26 (icon + 4 px
+                     gap) to make room. -->
+                <DynamicImage name="$parentIcon" handleinput="false" textureScale="0.34375">
+                    <Size><AbsPoint x="22" y="22" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft">
                             <AbsPoint x="0" y="0" />
+                        </Anchor>
+                    </Anchors>
+                    <TexDims x="64" y="64"/>
+                </DynamicImage>
+                <Label name="$parentSkill" textalign="left" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="114" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="26" y="0" />
                         </Anchor>
                     </Anchors>
                 </Label>

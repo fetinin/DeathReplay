@@ -29,11 +29,29 @@ local function dr_safe(fn_name, fn)
     end
 end
 
--- Open-RvR campaign zone ids. Copied from QueueQueuer.lua:280-302 (CampaignZones).
+-- Open-RvR zone ids. The scenario-tied campaign list at QueueQueuer.lua:276-302
+-- (CampaignZones) is incomplete -- it omits RvR lakes without scenarios (zone
+-- 102 etc.). The pairings at Enemy/Code/KillSpam/KillSpam.lua:494-504 are the
+-- authoritative open-RvR list: each elseif covers one realm-pair tier.
 local RVR_ZONES = {
+    -- T1: Greenskins (1/7), Empire (2/8), Dark Elves (6/11)
+    [1]   = true,  [7]   = true,
+    [2]   = true,  [8]   = true,
+    [6]   = true,  [11]  = true,
+    -- Plus campaign-zone T1s that have scenarios attached:
     [9]   = true,  [5]   = true,  [3]   = true,  [4]   = true,  [10]  = true,
+    -- T2: Greenskins (101/107), Empire (102/108)
+    [101] = true,  [107] = true,
+    [102] = true,  [108] = true,
+    -- Plus campaign-zone T2s:
     [103] = true,  [105] = true,  [109] = true,  [104] = true,  [110] = true,
+    -- Capitals
     [161] = true,  [162] = true,
+    -- T4: Greenskins (201/207), Empire (202/208), Dark Elves (200/206)
+    [200] = true,  [206] = true,
+    [201] = true,  [207] = true,
+    [202] = true,  [208] = true,
+    -- Plus campaign-zone T4s (forts + Eataine):
     [203] = true,  [205] = true,  [209] = true,  [204] = true,  [210] = true,
 }
 
@@ -48,6 +66,94 @@ local COMBAT_EVENT_KIND = {
     [GameData.CombatEvent.ABILITY_CRITICAL]  = { kind = "HIT", crit = true  },
 }
 local recentEvents          = {}   -- chronological, oldest first; each entry has .t (GetGameTime seconds) + kind + payload
+
+-- abilityId -> iconNum AND ability-name -> iconNum, harvested at
+-- PLAYER_EFFECTS_UPDATED from GetBuffs(SELF). The name-keyed cache exists
+-- because the engine's DoT ticks fire with a DIFFERENT abilityId than the
+-- effect's own abilityId on the buff bar (verified empirically: Touch of Palsy
+-- cast=8338, tick=3400). Both share the wstring name, so name match catches
+-- ticks the id match misses. GetAbilityData() only resolves icons for the
+-- player's own spellbook; for incoming enemy abilities we have to scrape
+-- iconNum off active debuffs. Covers DoTs / lingering effects; pure direct-
+-- damage abilities never appear. Runtime-only (not persisted).
+local iconCache       = {}
+local iconCacheByName = {}
+-- Maintained counters so the DR_BUFF debug line doesn't need an O(n) `pairs`
+-- walk on every PLAYER_EFFECTS_UPDATED. Increment-on-first-insert only.
+local iconCacheSize       = 0
+local iconCacheByNameSize = 0
+
+local effectFieldDumpDone = false
+local function harvestIconsFromActiveEffects()
+    local effects = GetBuffs(GameData.BuffTargetType.SELF)
+    if effects == nil then
+        if DeathReplay.IsDebug() then
+            EA_ChatWindow.Print(L"DR_BUFF GetBuffs returned nil")
+        end
+        return
+    end
+    local seen = 0
+    local added = 0
+    local firstE = nil
+    -- GetBuffs may return a sparse map (numeric keys not necessarily 1..N), so
+    -- iterate via pairs not ipairs.
+    for _, e in pairs(effects) do
+        seen = seen + 1
+        if firstE == nil then firstE = e end
+        if e.iconNum and e.iconNum > 0 then
+            if e.abilityId then
+                if iconCache[e.abilityId] == nil then
+                    added = added + 1
+                    iconCacheSize = iconCacheSize + 1
+                end
+                iconCache[e.abilityId] = e.iconNum
+            end
+            if e.name and e.name ~= L"" then
+                if iconCacheByName[e.name] == nil then
+                    iconCacheByNameSize = iconCacheByNameSize + 1
+                end
+                iconCacheByName[e.name] = e.iconNum
+            end
+        end
+    end
+    -- One-shot: dump keys of the first effect we see, so we can confirm whether
+    -- `abilityId` is actually a real field name on this engine build.
+    if DeathReplay.IsDebug() and firstE ~= nil and not effectFieldDumpDone then
+        effectFieldDumpDone = true
+        local keys = L""
+        for k, v in pairs(firstE) do
+            keys = keys .. L" " .. towstring(tostring(k)) .. L"=" .. towstring(tostring(v))
+        end
+        EA_ChatWindow.Print(L"DR_BUFF first-effect keys:" .. keys)
+    end
+    if DeathReplay.IsDebug() and (seen > 0 or added > 0) then
+        EA_ChatWindow.Print(L"DR_BUFF harvest seen=" .. towstring(seen)
+            .. L" added=" .. towstring(added)
+            .. L" cacheSize=" .. towstring(iconCacheSize)
+            .. L" byName=" .. towstring(iconCacheByNameSize))
+    end
+end
+
+local function resolveIconForAbility(abilityID, abilityName)
+    -- Player's own outgoing abilities resolve here (cheap, authoritative).
+    -- For most DeathReplay events (incoming damage) this path returns iconNum=0
+    -- so we fall through to the harvested-from-effects caches.
+    if abilityID and abilityID > 0 then
+        local data = GetAbilityData(abilityID)
+        if data and data.iconNum and data.iconNum > 0 then
+            return data.iconNum
+        end
+        local byId = iconCache[abilityID]
+        if byId then return byId end
+    end
+    -- Name fallback: catches DoT ticks whose abilityID differs from the buff's
+    -- effect.abilityId (e.g. Touch of Palsy cast=8338, tick=3400, name="Touch
+    -- of Palsy^n" on both).
+    if abilityName and abilityName ~= L"" then
+        return iconCacheByName[abilityName]
+    end
+    return nil
+end
 
 local deathState  = "alive"      -- "alive" | "dead"
 local captureDone = false        -- prevents double-capture on HP=0 re-fires
@@ -79,6 +185,7 @@ local function captureDeath()
         if e.kind == "HIT" then
             entry.ability   = e.ability
             entry.abilityId = e.abilityId
+            entry.iconNum   = e.iconNum
             entry.amount    = e.amount
             entry.crit      = e.crit
             -- Last HIT event wins as killing blow.
@@ -86,6 +193,7 @@ local function captureDeath()
                 kind      = (e.crit and "ABILITY_CRITICAL" or "ABILITY_HIT"),
                 ability   = e.ability,
                 abilityId = e.abilityId,
+                iconNum   = e.iconNum,
                 amount    = e.amount,
             }
             entry.killingBlow = true       -- will be cleared below for non-final HITs
@@ -103,6 +211,38 @@ local function captureDeath()
             end
         end
     end
+
+    -- Back-propagate iconNum across same-ability events. The harvest-from-
+    -- effects cache fills lazily, so the FIRST hit of any new debuff lands
+    -- before PLAYER_EFFECTS_UPDATED has had a chance to seed iconCache. The
+    -- name fallback covers the case where the engine's DoT ticks fire with a
+    -- different abilityId than the parent cast (Touch of Palsy: cast=8338,
+    -- tick=3400, name matches on both). Pass 1: build aid/name -> iconNum
+    -- maps from any populated entry. Pass 2: fill nil-iconNum entries via id,
+    -- falling back to name.
+    local iconByAid, iconByName = {}, {}
+    for _, e in ipairs(events) do
+        if e.iconNum and e.iconNum > 0 then
+            if e.abilityId and iconByAid[e.abilityId] == nil then
+                iconByAid[e.abilityId] = e.iconNum
+            end
+            if e.ability and e.ability ~= L"" and iconByName[e.ability] == nil then
+                iconByName[e.ability] = e.iconNum
+            end
+        end
+    end
+    local function backfill(target)
+        if target.iconNum and target.iconNum > 0 then return end
+        if target.abilityId and iconByAid[target.abilityId] then
+            target.iconNum = iconByAid[target.abilityId]
+            return
+        end
+        if target.ability and target.ability ~= L"" and iconByName[target.ability] then
+            target.iconNum = iconByName[target.ability]
+        end
+    end
+    for _, e in ipairs(events) do backfill(e) end
+    if killingBlow then backfill(killingBlow) end
 
     local death = {
         timestamp   = deathTime,
@@ -190,13 +330,29 @@ function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
     -- only; same sign-based DAMAGE/HEAL split used in wsct.lua:515-527.
     if amount == nil or amount >= 0 then return end
     local abilityName = GetAbilityName(abilityID)
+    local iconNum = resolveIconForAbility(abilityID, abilityName)
+    if DeathReplay.IsDebug() then
+        EA_ChatWindow.Print(L"DR_HIT aid=" .. towstring(abilityID)
+            .. L" icon=" .. towstring(iconNum or "nil")
+            .. L" name=" .. towstring(abilityName))
+    end
     pushEvent({
         kind      = mapping.kind,
         crit      = mapping.crit,
         amount    = -amount,
         abilityId = abilityID,
         ability   = abilityName,    -- may be empty wstring if unresolvable
+        iconNum   = iconNum,        -- may be nil if cache miss
     })
+end
+
+-- Engine fires this when a buff/debuff is added/refreshed/removed on the player.
+-- We don't care about the diff -- just re-walk the full SELF effect list and
+-- refresh the iconCache so OnCombatEvent's resolveIconForAbility() has fresh
+-- data for the most common case (an enemy applied a debuff; the next combat
+-- event tick of that debuff will then match the cache).
+function DeathReplay.OnEffectsUpdated()
+    harvestIconsFromActiveEffects()
 end
 
 function DeathReplay.OnHitPointsUpdated()
@@ -255,6 +411,17 @@ function DeathReplay.OnInitialize()
 
         RegisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
 
+        RegisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
+        -- Seed iconCache with whatever's currently active so a hit that lands
+        -- before the first PLAYER_EFFECTS_UPDATED still has a chance to resolve.
+        harvestIconsFromActiveEffects()
+
+        -- Seed isPvpNow from current GameData. None of the context-change
+        -- events refire on /reloadui mid-scenario, so without this seed the
+        -- cache stays at its initial `false` and OnCombatEvent rejects every
+        -- hit until the next zone change.
+        recomputePvpContext()
+
         EA_ChatWindow.Print(L"DeathReplay v0.1.0 loaded.")
 
         if DeathReplayIndicator and DeathReplayIndicator.Recompute then
@@ -275,6 +442,8 @@ function DeathReplay.OnShutdown()
     UnregisterEventHandler(SystemData.Events.WORLD_OBJ_COMBAT_EVENT, "DeathReplay.OnCombatEvent")
 
     UnregisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
+
+    UnregisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
 end
 
 function DeathReplay.OnUpdate(elapsed)
