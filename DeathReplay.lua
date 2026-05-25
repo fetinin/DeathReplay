@@ -82,11 +82,13 @@ local iconCacheByName = {}
 local iconCacheSize       = 0
 local iconCacheByNameSize = 0
 
--- abilityID -> iconNum, harvested once at init from Warbuilder.Career[].
--- Covers direct-hit abilities (no debuff aura) that the runtime iconCache
--- never sees. ~1850 entries across all 24 PvP careers. Hard-dep on Warbuilder
+-- abilityID -> { icon, type, buffType, line }, harvested once at init from
+-- Warbuilder.Career[]. Covers direct-hit abilities that the runtime iconCache
+-- never sees, and supplies the tooltip subtitle data (career name via
+-- GetCareerLine(line), human-readable type via Warbuilder.GetType/GetBuffType).
+-- ~1500 unique entries across all 24 PvP careers. Hard-dep on Warbuilder
 -- declared in DeathReplay.mod so the table is guaranteed populated at init.
-local staticAbilityIconDB = {}
+local staticAbilityDB = {}
 
 local effectFieldDumpDone = false
 local function harvestIconsFromActiveEffects()
@@ -139,20 +141,31 @@ local function harvestIconsFromActiveEffects()
     end
 end
 
-local function buildStaticAbilityIconDB()
+local function buildStaticAbilityDB()
     if not Warbuilder or not Warbuilder.Career then return end
     local count = 0
-    local function ingest(e)
-        if e and e.ID and e.Icon and e.Icon > 0 and staticAbilityIconDB[e.ID] == nil then
-            staticAbilityIconDB[e.ID] = e.Icon
+    local function ingest(e, careerLine)
+        if e and e.ID and staticAbilityDB[e.ID] == nil then
+            staticAbilityDB[e.ID] = {
+                icon     = e.Icon,
+                type     = e.Type,
+                buffType = e.BuffType,
+                line     = careerLine,
+            }
             count = count + 1
         end
     end
     for _, career in pairs(Warbuilder.Career) do
+        -- Use career.Line (the canonical career-line id used by GetCareerLine),
+        -- not the table key. Warbuilder's own code does the same -- see
+        -- Warbuilder.lua:349 which calls GetCareerLine(Warbuilder.Career[k].Line).
+        -- They match in the shipped data, but reading the named field is more
+        -- robust against any future reshuffle.
+        local careerLine = career.Line
         if career.Core then
             -- Core.Ability / Core.Tactic / Core.Morale are flat arrays.
             for _, list in pairs({career.Core.Ability, career.Core.Tactic, career.Core.Morale}) do
-                for _, e in ipairs(list) do ingest(e) end
+                for _, e in ipairs(list) do ingest(e, careerLine) end
             end
         end
         if career.Path then
@@ -162,15 +175,24 @@ local function buildStaticAbilityIconDB()
             -- mastery tactics/morales. ipairs iterates only numeric keys.
             for _, path in ipairs(career.Path) do
                 if path.Core then
-                    for _, e in ipairs(path.Core) do ingest(e) end
+                    for _, e in ipairs(path.Core) do ingest(e, careerLine) end
                 end
-                for _, e in ipairs(path) do ingest(e) end
+                for _, e in ipairs(path) do ingest(e, careerLine) end
             end
         end
     end
     if DeathReplay.IsDebug() then
-        EA_ChatWindow.Print(L"DR_INIT staticAbilityIconDB built, entries=" .. towstring(count))
+        EA_ChatWindow.Print(L"DR_INIT staticAbilityDB built, entries=" .. towstring(count))
     end
+end
+
+-- Accessor for the GUI tooltip layer. Returns { icon, type, buffType, line }
+-- for abilities in the Warbuilder database, nil otherwise (NPC, items,
+-- renown). Callers must tolerate nil and fall back to engine APIs for name
+-- and description.
+function DeathReplay.GetAbilityMeta(abilityID)
+    if not abilityID or abilityID <= 0 then return nil end
+    return staticAbilityDB[abilityID]
 end
 
 local function resolveIconForAbility(abilityID, abilityName)
@@ -198,7 +220,10 @@ local function resolveIconForAbility(abilityID, abilityName)
     -- it deliberately sits after the runtime name cache that catches DoT tick
     -- IDs.
     if abilityID and abilityID > 0 then
-        return staticAbilityIconDB[abilityID]
+        local meta = staticAbilityDB[abilityID]
+        if meta and meta.icon and meta.icon > 0 then
+            return meta.icon
+        end
     end
     return nil
 end
@@ -455,8 +480,9 @@ function DeathReplay.OnInitialize()
         -- before the first PLAYER_EFFECTS_UPDATED still has a chance to resolve.
         harvestIconsFromActiveEffects()
         -- One-shot ingest of Warbuilder's static ability database so direct-hit
-        -- abilities (no debuff aura) resolve to icons too.
-        buildStaticAbilityIconDB()
+        -- abilities (no debuff aura) resolve to icons too, and so rows can
+        -- enrich their hover tooltip with career name + ability category.
+        buildStaticAbilityDB()
 
         -- Seed isPvpNow from current GameData. None of the context-change
         -- events refire on /reloadui mid-scenario, so without this seed the

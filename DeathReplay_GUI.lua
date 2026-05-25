@@ -138,12 +138,20 @@ local function aggregateBySkill(d)
             local row = byName[key]
             if row == nil then
                 row = {
-                    name    = key,
-                    total   = 0, hits = 0, crits = 0,
-                    max     = 0, maxCrit = false,
-                    iconNum = nil,
+                    name      = key,
+                    total     = 0, hits = 0, crits = 0,
+                    max       = 0, maxCrit = false,
+                    iconNum   = nil,
+                    abilityId = nil,  -- first non-zero hit's id; drives the hover tooltip lookup
                 }
                 byName[key] = row
+            end
+            -- Capture a representative abilityId for the aggregated row.
+            -- Mirrors the iconNum-first-wins pattern: cast + ticks of the
+            -- same ability merge into one row, so the cast id (or whatever
+            -- the engine fired first) is fine for the tooltip lookup.
+            if row.abilityId == nil and e.abilityId and e.abilityId > 0 then
+                row.abilityId = e.abilityId
             end
             row.total = row.total + (e.amount or 0)
             row.hits  = row.hits + 1
@@ -173,14 +181,15 @@ local function aggregateBySkill(d)
             Hits    = towstring(r.hits),
             Avg     = towstring(avg),
             Max     = maxText,
-            _name    = r.name,
-            _total   = r.total,
-            _hits    = r.hits,
-            _avg     = avg,
-            _max     = r.max,
-            _maxCrit = r.maxCrit,
-            _crits   = r.crits,
-            _iconNum = r.iconNum,
+            _name      = r.name,
+            _total     = r.total,
+            _hits      = r.hits,
+            _avg       = avg,
+            _max       = r.max,
+            _maxCrit   = r.maxCrit,
+            _crits     = r.crits,
+            _iconNum   = r.iconNum,
+            _abilityId = r.abilityId,  -- drives OnRowMouseOver tooltip lookup
         }
     end
 end
@@ -237,14 +246,15 @@ local function populateTimeline(d)
             local flags = L""
             if e.killingBlow then flags = L" *KB*" end
             table.insert(DeathReplay_GUI.Listdata, {
-                Time     = dtText,
-                Name     = abilityDisplayName(e.ability, e.abilityId),
-                Amount   = towstring(e.amount or 0),
-                Flags    = flags,
-                _dt      = e.dt or 0,
-                _amount  = e.amount or 0,
-                _crit    = e.crit and true or false,
-                _iconNum = e.iconNum,   -- captured at hit-time; nil for cache misses / pre-feature deaths
+                Time      = dtText,
+                Name      = abilityDisplayName(e.ability, e.abilityId),
+                Amount    = towstring(e.amount or 0),
+                Flags     = flags,
+                _dt       = e.dt or 0,
+                _amount   = e.amount or 0,
+                _crit     = e.crit and true or false,
+                _iconNum  = e.iconNum,   -- captured at hit-time; nil for cache misses / pre-feature deaths
+                _abilityId = e.abilityId, -- needed by OnRowMouseOver tooltip lookup
             })
         end
     end
@@ -549,6 +559,89 @@ function DeathReplay_GUI.OnClose()
     DeathReplay_GUI.Hide()
 end
 
+-- Resolve the active mouse-over row window name back to its data record.
+-- Engine names instantiated rows ...Row1, ...Row2, ...; the trailing index k
+-- is the same k used in OnRowPopulated where PopulatorIndices[k] maps to the
+-- source data array. Returns the row record, or nil for unrecognized names.
+local function rowDataFromWindowName(windowName)
+    if windowName == nil then return nil end
+    local tIdx = string.match(windowName, "DeathReplay_GUITimelineRow(%d+)$")
+    if tIdx then
+        local list = _G["DeathReplay_GUITimeline"]
+        if not list or not list.PopulatorIndices then return nil end
+        local dataIndex = list.PopulatorIndices[tonumber(tIdx)]
+        if not dataIndex then return nil end
+        return DeathReplay_GUI.Listdata[dataIndex]
+    end
+    local oIdx = string.match(windowName, "DeathReplay_GUIOverviewContentListRow(%d+)$")
+    if oIdx then
+        local list = _G["DeathReplay_GUIOverviewContentList"]
+        if not list or not list.PopulatorIndices then return nil end
+        local dataIndex = list.PopulatorIndices[tonumber(oIdx)]
+        if not dataIndex then return nil end
+        return DeathReplay_GUI.OverviewData[dataIndex]
+    end
+    return nil
+end
+
+-- Build a hover tooltip with ability name, attacker career / type /
+-- category subtitle (when the ability is in the Warbuilder DB), and the
+-- full ability description from the engine. Mirrors the pattern in
+-- Warbuilder/Source/Warbuilder.lua:1069-1082.
+function DeathReplay_GUI.OnRowMouseOver()
+    local row = rowDataFromWindowName(SystemData.ActiveWindow.name)
+    if row == nil then return end
+    local abilityID = row._abilityId
+    if not abilityID or abilityID <= 0 then return end
+
+    local meta = DeathReplay.GetAbilityMeta(abilityID)
+    local name = GetAbilityName(abilityID)
+    if name == nil or name == L"" then
+        -- Timeline rows expose the display name on row.Name, Overview rows on
+        -- row.Skill. Try each in turn before giving up to the "Ability #N" form.
+        if row.Name and row.Name ~= L"" then
+            name = row.Name
+        elseif row.Skill and row.Skill ~= L"" then
+            name = row.Skill
+        else
+            name = L"Ability #" .. towstring(abilityID)
+        end
+    end
+    local desc = GetAbilityDesc(abilityID, 40)
+
+    Tooltips.CreateTextOnlyTooltip(SystemData.ActiveWindow.name, nil)
+    Tooltips.SetTooltipColor(1, 1, 255, 220, 80)
+    Tooltips.SetTooltipText (1, 1, name)
+
+    if meta and meta.line then
+        local careerName = GetCareerLine(meta.line)
+        local typeStr    = (Warbuilder and Warbuilder.GetType    and Warbuilder.GetType(meta.type))     or L""
+        local buffStr    = (Warbuilder and Warbuilder.GetBuffType and Warbuilder.GetBuffType(meta.buffType)) or L""
+        local subtitle   = towstring(careerName or L"")
+        if typeStr ~= L"" then subtitle = subtitle .. L"  -  " .. towstring(typeStr) end
+        if buffStr ~= L"" then subtitle = subtitle .. L"  -  " .. towstring(buffStr) end
+        Tooltips.SetTooltipColor(2, 1, 180, 180, 180)
+        Tooltips.SetTooltipText (2, 1, subtitle)
+    end
+
+    if desc and desc ~= L"" then
+        Tooltips.SetTooltipColor(3, 1, 255, 255, 255)
+        Tooltips.SetTooltipText (3, 1, desc)
+    end
+
+    -- Cursor-anchored: tooltip follows the mouse so it appears next to the
+    -- hovered row regardless of where the player has dragged the DeathReplay
+    -- window. ANCHOR_CURSOR is the constant Enemy and other addons use for
+    -- in-list hover tooltips (Enemy/Code/UnitFrames/UnitFrame.lua:568).
+    Tooltips.AnchorTooltip(Tooltips.ANCHOR_CURSOR)
+    Tooltips.Finalize()
+end
+
+function DeathReplay_GUI.OnRowMouseOverEnd()
+    -- Engine dismisses text-only tooltips automatically when the mouse leaves
+    -- the anchor window; no explicit teardown needed.
+end
+
 -- Wrap all public entry points in pcall + trace for diagnosis.
 DeathReplay_GUI.Show            = dr_safe("Show",            DeathReplay_GUI.Show)
 DeathReplay_GUI.Hide            = dr_safe("Hide",            DeathReplay_GUI.Hide)
@@ -563,3 +656,5 @@ DeathReplay_GUI.OnOverviewRowPopulated = dr_safe("OnOverviewRowPopulated", Death
 DeathReplay_GUI.OnOverviewSort  = dr_safe("OnOverviewSort",  DeathReplay_GUI.OnOverviewSort)
 DeathReplay_GUI.OnTabClick      = dr_safe("OnTabClick",      DeathReplay_GUI.OnTabClick)
 DeathReplay_GUI.OnClose         = dr_safe("OnClose",         DeathReplay_GUI.OnClose)
+DeathReplay_GUI.OnRowMouseOver    = dr_safe("OnRowMouseOver",    DeathReplay_GUI.OnRowMouseOver)
+DeathReplay_GUI.OnRowMouseOverEnd = dr_safe("OnRowMouseOverEnd", DeathReplay_GUI.OnRowMouseOverEnd)

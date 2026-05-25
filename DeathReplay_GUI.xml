@@ -297,6 +297,12 @@
              template-time anchor resolution. -->
         <Window name="DeathReplay_GUI_TimelineRow">
             <Size><AbsPoint x="410" y="22" /></Size>
+            <!-- Mouse-over fires on the row window itself; child labels and the
+                 DynamicImage (handleinput="false") let events bubble up. -->
+            <EventHandlers>
+                <EventHandler event="OnMouseOver"    function="DeathReplay_GUI.OnRowMouseOver"/>
+                <EventHandler event="OnMouseOverEnd" function="DeathReplay_GUI.OnRowMouseOverEnd"/>
+            </EventHandlers>
             <Windows>
                 <Label name="$parentTime" textalign="right" font="font_chat_text" warnOnTextCropped="false">
                     <Size><AbsPoint x="70" y="22" /></Size>
@@ -354,6 +360,10 @@
              the right edge, matching DeathReplay_GUI_TimelineRow's footprint. -->
         <Window name="DeathReplay_GUI_OverviewRow">
             <Size><AbsPoint x="410" y="22" /></Size>
+            <EventHandlers>
+                <EventHandler event="OnMouseOver"    function="DeathReplay_GUI.OnRowMouseOver"/>
+                <EventHandler event="OnMouseOverEnd" function="DeathReplay_GUI.OnRowMouseOverEnd"/>
+            </EventHandlers>
             <Windows>
                 <!-- Icon column on the Overview row, same widget pattern and
                      22/64=0.34375 textureScale as the Timeline row template
