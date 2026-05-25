@@ -306,7 +306,10 @@
                         </Anchor>
                     </Anchors>
                 </Label>
-                <DynamicImage name="$parentIcon" handleinput="false">
+                <!-- textureScale 22/64 == 0.34375 -- engine ability icons are
+                     64x64 native, and runtime DynamicImageSetTextureScale wasn't
+                     sticking, so we anchor the scale statically (PotionBar pattern). -->
+                <DynamicImage name="$parentIcon" handleinput="false" textureScale="0.34375">
                     <Size><AbsPoint x="22" y="22" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft">

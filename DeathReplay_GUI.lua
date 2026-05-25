@@ -263,13 +263,10 @@ function DeathReplay_GUI.OnRowPopulated()
             if iconNum and iconNum > 0 then
                 local tex, ix, iy = GetIconData(iconNum)
                 if tex and tex ~= "" and tex ~= "icon000000" then
+                    -- Scale comes from textureScale in XML; runtime tweaks only
+                    -- set the source rect + texture. Match PotionBar's pattern.
                     DynamicImageSetTextureDimensions(iconName, ix, iy)
                     DynamicImageSetTexture(iconName, tex, ix, iy)
-                    -- Source ability-icon sheet is 64x64; our slot is 22x22.
-                    if ix and ix > 0 then
-                        local s = 22 / ix
-                        DynamicImageSetTextureScale(iconName, s, s)
-                    end
                     WindowSetShowing(iconName, true)
                 else
                     WindowSetShowing(iconName, false)
