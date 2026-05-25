@@ -384,11 +384,27 @@
                         </Anchor>
                     </Anchors>
                 </Label>
-                <Label name="$parentHits" textalign="center" font="font_chat_text" warnOnTextCropped="false">
-                    <Size><AbsPoint x="80" y="22" /></Size>
+                <!-- Hits cell is split into two sibling labels so the crit
+                     count can render bold while the main hit count stays in
+                     the regular weight. The pair occupies the original 80px
+                     column (template-local x=210..290): $parentHits is right-
+                     aligned in the left half, $parentHitsCrit is left-aligned
+                     in the right half, putting the visual seam near the
+                     column center. $parentHitsCrit text + font are set in
+                     OnOverviewRowPopulated (and hidden when crits=0). -->
+                <Label name="$parentHits" textalign="right" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="38" y="22" /></Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft">
                             <AbsPoint x="210" y="0" />
+                        </Anchor>
+                    </Anchors>
+                </Label>
+                <Label name="$parentHitsCrit" textalign="left" font="font_chat_text" warnOnTextCropped="false">
+                    <Size><AbsPoint x="40" y="22" /></Size>
+                    <Anchors>
+                        <Anchor point="topleft" relativePoint="topleft">
+                            <AbsPoint x="250" y="0" />
                         </Anchor>
                     </Anchors>
                 </Label>

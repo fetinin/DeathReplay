@@ -164,12 +164,13 @@ local function aggregateBySkill(d)
         -- Max stays a plain number; crit-ness is communicated in
         -- OnOverviewRowPopulated by swapping the cell's font to bold.
         local maxText = towstring(r.max)
-        local hitsText = towstring(r.hits)
-        if r.crits > 0 then hitsText = hitsText .. L" (" .. towstring(r.crits) .. L" CRIT)" end
+        -- Hits column shows just the plain count. The crit count, when > 0,
+        -- renders in a sibling $parentHitsCrit label (set in the row populator)
+        -- so we can bold only the "(N)" part without affecting the main count.
         DeathReplay_GUI.OverviewData[#DeathReplay_GUI.OverviewData + 1] = {
             Skill   = r.name,
             Total   = towstring(r.total),
-            Hits    = hitsText,
+            Hits    = towstring(r.hits),
             Avg     = towstring(avg),
             Max     = maxText,
             _name    = r.name,
@@ -178,6 +179,7 @@ local function aggregateBySkill(d)
             _avg     = avg,
             _max     = r.max,
             _maxCrit = r.maxCrit,
+            _crits   = r.crits,
             _iconNum = r.iconNum,
         }
     end
@@ -230,14 +232,10 @@ local function populateTimeline(d)
             -- %3.0f rounds to nearest integer and keeps width consistent for
             -- "-10s" through "  0s" (GetGameTime returns seconds).
             local dtText = towstring(string.format("%3.0fs", e.dt))
-            -- Leading space separates the flag text from the right-aligned
-            -- Amount column that visually butts up against the Flags column.
+            -- Crit-ness is conveyed by bolding the Amount cell in
+            -- OnRowPopulated; Flags now only carries the killing-blow marker.
             local flags = L""
-            if e.crit then flags = L" CRIT" end
-            if e.killingBlow then
-                if flags == L"" then flags = L" *KB*"
-                else flags = flags .. L" *KB*" end
-            end
+            if e.killingBlow then flags = L" *KB*" end
             table.insert(DeathReplay_GUI.Listdata, {
                 Time     = dtText,
                 Name     = abilityDisplayName(e.ability, e.abilityId),
@@ -245,6 +243,7 @@ local function populateTimeline(d)
                 Flags    = flags,
                 _dt      = e.dt or 0,
                 _amount  = e.amount or 0,
+                _crit    = e.crit and true or false,
                 _iconNum = e.iconNum,   -- captured at hit-time; nil for cache misses / pre-feature deaths
             })
         end
@@ -264,6 +263,16 @@ function DeathReplay_GUI.OnRowPopulated()
             LabelSetTextColor(rowName .. "Name",   255, 255, 255)
             LabelSetTextColor(rowName .. "Amount", 255,  80,  80)
             LabelSetTextColor(rowName .. "Flags",  255, 220,  80)
+
+            -- Crit marker on the timeline: swap Amount to bold instead of
+            -- printing a separate "CRIT" tag. Same font pair as the Overview
+            -- Max cell uses (font_clear_small_bold vs font_chat_text); the
+            -- LinespacingArgument is mandatory or LabelSetFont silently no-ops.
+            if row._crit then
+                LabelSetFont(rowName .. "Amount", "font_clear_small_bold", WindowUtils.FONT_DEFAULT_TEXT_LINESPACING)
+            else
+                LabelSetFont(rowName .. "Amount", "font_chat_text", WindowUtils.FONT_DEFAULT_TEXT_LINESPACING)
+            end
 
             -- Icon column: render only if we captured an iconNum at hit-time
             -- (via DeathReplay.lua's GetBuffs(SELF) harvest). Otherwise hide the
@@ -314,6 +323,20 @@ function DeathReplay_GUI.OnOverviewRowPopulated()
                 LabelSetFont(rowName .. "Max", "font_clear_small_bold", WindowUtils.FONT_DEFAULT_TEXT_LINESPACING)
             else
                 LabelSetFont(rowName .. "Max", "font_chat_text", WindowUtils.FONT_DEFAULT_TEXT_LINESPACING)
+            end
+
+            -- Crit count "(N)" rendered as a bold sibling to $parentHits so
+            -- only the parenthetical is bold while the plain hit count keeps
+            -- the normal font. Hidden when there are no crits, since recycled
+            -- rows would otherwise leak the previous skill's crit count.
+            local hitsCritName = rowName .. "HitsCrit"
+            if row._crits and row._crits > 0 then
+                LabelSetText(hitsCritName, L" (" .. towstring(row._crits) .. L")")
+                LabelSetFont(hitsCritName, "font_clear_small_bold", WindowUtils.FONT_DEFAULT_TEXT_LINESPACING)
+                LabelSetTextColor(hitsCritName, 220, 220, 220)
+                WindowSetShowing(hitsCritName, true)
+            else
+                WindowSetShowing(hitsCritName, false)
             end
 
             -- Icon column: same scheme as the Timeline row populator. Hide
