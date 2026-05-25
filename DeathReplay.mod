@@ -59,8 +59,5 @@
         <OnShutdown>
             <CallFunction name="DeathReplay.OnShutdown" />
         </OnShutdown>
-        <OnUpdate>
-            <CallFunction name="DeathReplay.OnUpdate" />
-        </OnUpdate>
     </UiMod>
 </ModuleFile>

@@ -57,8 +57,7 @@ local RVR_ZONES = {
 
 local isPvpNow = false   -- cached; updated by DeathReplay.OnContextMaybeChanged
 
-local BUFFER_WINDOW_S       = 10
-local MAX_EVENTS_BUFFERED   = 500
+local MAX_EVENTS_BUFFERED   = 1000
 local COMBAT_EVENT_KIND = {
     [GameData.CombatEvent.HIT]               = { kind = "HIT", crit = false },
     [GameData.CombatEvent.ABILITY_HIT]       = { kind = "HIT", crit = false },
@@ -348,19 +347,6 @@ local function defaultSavedVariables()
     }
 end
 
-local trimAccumulator = 0
-local TRIM_INTERVAL_S = 0.5
-
-local function trimRecentEvents()
-    if #recentEvents == 0 then return end
-    local now = GetGameTime()              -- seconds
-    local cutoff = now - BUFFER_WINDOW_S
-    -- Drop from the front until oldest entry is within the window.
-    while #recentEvents > 0 and recentEvents[1].t < cutoff do
-        table.remove(recentEvents, 1)
-    end
-end
-
 local function pushEvent(entry)
     entry.t = GetGameTime()
     if #recentEvents >= MAX_EVENTS_BUFFERED then
@@ -406,7 +392,8 @@ end
 
 function DeathReplay.OnHitPointsUpdated()
     if not isPvpNow then return end
-    local hp = GameData.Player.hitPoints and GameData.Player.hitPoints.current or 0
+    local hp    = GameData.Player.hitPoints and GameData.Player.hitPoints.current or 0
+    local maxHp = GameData.Player.hitPoints and GameData.Player.hitPoints.maximum or 0
     if deathState == "alive" and hp == 0 and not captureDone then
         captureDeath()
         captureDone = true
@@ -414,6 +401,9 @@ function DeathReplay.OnHitPointsUpdated()
     elseif deathState == "dead" and hp > 0 then
         deathState  = "alive"
         captureDone = false
+    end
+    if hp > 0 and maxHp > 0 and hp >= maxHp and #recentEvents > 0 then
+        recentEvents = {}
     end
 end
 
@@ -496,13 +486,6 @@ function DeathReplay.OnShutdown()
     UnregisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
 
     UnregisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
-end
-
-function DeathReplay.OnUpdate(elapsed)
-    trimAccumulator = trimAccumulator + elapsed
-    if trimAccumulator < TRIM_INTERVAL_S then return end
-    trimAccumulator = 0
-    trimRecentEvents()
 end
 
 function DeathReplay.HandleSlash(input)
