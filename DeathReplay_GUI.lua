@@ -83,7 +83,7 @@ local function applyTabVisibility()
 end
 
 local function deaths()
-    return DeathReplay_SavedVariables and DeathReplay_SavedVariables.deaths or {}
+    return DeathReplay.GetCharDeaths()
 end
 
 -- abilityId=0 covers both melee and ranged auto-attacks (the engine reports

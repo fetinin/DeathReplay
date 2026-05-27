@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ModuleFile xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-    <UiMod name="DeathReplay" version="0.1.0" date="5/15/2026" autoenabled="true">
+    <UiMod name="DeathReplay" version="0.3.0" date="5/27/2026" autoenabled="true">
         <VersionSettings gameVersion="1.4.8" windowsVersion="1.0" savedVariablesVersion="1.0" />
         <Author name="self" email="" />
         <Description text="Records incoming damage and the killing blow on every PvP death, then replays it as a browsable timeline with ability icons and tooltips. /dr to open." />

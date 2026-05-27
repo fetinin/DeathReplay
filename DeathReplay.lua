@@ -1,9 +1,35 @@
--- DeathReplay v0.1.0 — skeleton, see docs/superpowers/specs/2026-05-15-death-replay-design.md
+-- DeathReplay v0.3.0 — skeleton, see docs/superpowers/specs/2026-05-15-death-replay-design.md
 
 DeathReplay = {}
 DeathReplay_SavedVariables = nil   -- engine populates from disk on load, or leaves nil on first run
 
-local SCHEMA_VERSION = 2
+local SCHEMA_VERSION = 3
+
+-- Per-character death bucketing. The engine has no SavedVariablesPerCharacter
+-- declaration, so we shard inside the single account-wide SavedVariable.
+-- Key shape (slot + server) matches Pure/AceDB-3.0.lua:305-306 -- stable across
+-- character renames, populated by the time OnInitialize fires.
+local function characterKey()
+    local slot   = GameData.Account.SelectedCharacterSlot
+    local server = GameData.Account.ServerName
+    return tostring(slot) .. " - " .. tostring(server)
+end
+
+local function getCharDeaths()
+    local chars = DeathReplay_SavedVariables.characters
+    local key   = characterKey()
+    if chars[key] == nil then chars[key] = { deaths = {} } end
+    return chars[key].deaths
+end
+
+-- Public accessor for the GUI / Indicator modules.
+function DeathReplay.GetCharDeaths()
+    if DeathReplay_SavedVariables == nil
+       or DeathReplay_SavedVariables.characters == nil then
+        return {}
+    end
+    return getCharDeaths()
+end
 
 function DeathReplay.IsDebug()
     return DeathReplay_SavedVariables ~= nil
@@ -328,9 +354,10 @@ local function captureDeath()
     }
 
     -- Prepend, FIFO trim to maxDeathsStored
-    table.insert(DeathReplay_SavedVariables.deaths, 1, death)
-    while #DeathReplay_SavedVariables.deaths > DeathReplay_SavedVariables.config.maxDeathsStored do
-        table.remove(DeathReplay_SavedVariables.deaths)
+    local charDeaths = getCharDeaths()
+    table.insert(charDeaths, 1, death)
+    while #charDeaths > DeathReplay_SavedVariables.config.maxDeathsStored do
+        table.remove(charDeaths)
     end
 
     if DeathReplayIndicator and DeathReplayIndicator.Recompute then
@@ -361,14 +388,14 @@ end
 
 local function defaultSavedVariables()
     return {
-        version = SCHEMA_VERSION,
-        config  = {
+        version    = SCHEMA_VERSION,
+        config     = {
             bufferWindowSeconds = 10,
             maxDeathsStored     = 5,
             captureMode         = "pvp",
             debug               = false,
         },
-        deaths  = {},
+        characters = {},
     }
 end
 
@@ -444,22 +471,15 @@ function DeathReplay.OnInitialize()
             DeathReplay_SavedVariables.config.debug = false
         end
 
-        -- Migration v1 -> v2: drop BUFF_GAIN/BUFF_LOSS entries left over from
-        -- when DeathReplay recorded buff diffs. Safe to delete once all installs
-        -- have run this at least once -- see bd DeathReplay-2cb.
-        if (DeathReplay_SavedVariables.version or 1) < 2 then
-            for _, death in ipairs(DeathReplay_SavedVariables.deaths) do
-                if death.events then
-                    local kept = {}
-                    for _, e in ipairs(death.events) do
-                        if e.kind == "HIT" then
-                            table.insert(kept, e)
-                        end
-                    end
-                    death.events = kept
-                end
-            end
-            DeathReplay_SavedVariables.version = 2
+        -- Migration v1/v2 -> v3: deaths used to live at the root as one flat
+        -- account-wide list; v3 buckets them per character under .characters.
+        -- Pre-v3 captures are discarded (clean slate; capped at maxDeathsStored
+        -- so the loss is small). Also drops the v1 BUFF_GAIN/BUFF_LOSS cleanup
+        -- since the legacy table is going away anyway.
+        if (DeathReplay_SavedVariables.version or 1) < 3 then
+            DeathReplay_SavedVariables.deaths     = nil
+            DeathReplay_SavedVariables.characters = DeathReplay_SavedVariables.characters or {}
+            DeathReplay_SavedVariables.version    = 3
         end
 
         LibSlash.RegisterSlashCmd("dr", function(input) DeathReplay.HandleSlash(input) end)
@@ -490,7 +510,7 @@ function DeathReplay.OnInitialize()
         -- hit until the next zone change.
         recomputePvpContext()
 
-        EA_ChatWindow.Print(L"DeathReplay v0.1.0 loaded.")
+        EA_ChatWindow.Print(L"DeathReplay v0.3.0 loaded.")
 
         if DeathReplayIndicator and DeathReplayIndicator.Recompute then
             DeathReplayIndicator.Recompute()
@@ -532,8 +552,9 @@ function DeathReplay.HandleSlash(input)
         return
     end
     if cmd == "reset" then
-        local n = #DeathReplay_SavedVariables.deaths
-        DeathReplay_SavedVariables.deaths = {}
+        local list = getCharDeaths()
+        local n = #list
+        for i = #list, 1, -1 do list[i] = nil end
         recentEvents = {}
         if DeathReplay_GUI and DeathReplay_GUI.Render then
             DeathReplay_GUI.Render()

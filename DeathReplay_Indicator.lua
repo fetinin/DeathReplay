@@ -18,7 +18,7 @@ end
 
 function DeathReplayIndicator.Recompute()
     local anyUnviewed = false
-    for _, d in ipairs(DeathReplay_SavedVariables.deaths) do
+    for _, d in ipairs(DeathReplay.GetCharDeaths()) do
         if d.viewed == false then anyUnviewed = true; break end
     end
     -- v1 simplification: show the widget only when there are unviewed deaths.
