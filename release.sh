@@ -79,7 +79,7 @@ cur_re="$(esc_re "$current_version")"
 # Three edits, each anchored to its surrounding context so we don't catch
 # any incidental occurrences of the old version string elsewhere.
 sed -i '' -E "s/(name=\"DeathReplay\" version=\")${cur_re}(\")/\1${VERSION}\2/" DeathReplay.mod
-sed -i '' -E "s/(date=\")[0-9]+\/[0-9]+\/[0-9]+(\")/\1${today}\2/" DeathReplay.mod
+sed -i '' -E "s|(date=\")[0-9]+/[0-9]+/[0-9]+(\")|\1${today}\2|" DeathReplay.mod
 sed -i '' -E "s/^(-- DeathReplay v)${cur_re}( —)/\1${VERSION}\2/" DeathReplay.lua
 sed -i '' -E "s/(L\"DeathReplay v)${cur_re}( loaded\.\")/\1${VERSION}\2/" DeathReplay.lua
 
