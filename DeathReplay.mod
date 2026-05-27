@@ -3,7 +3,7 @@
     <UiMod name="DeathReplay" version="0.1.0" date="5/15/2026" autoenabled="true">
         <VersionSettings gameVersion="1.4.8" windowsVersion="1.0" savedVariablesVersion="1.0" />
         <Author name="self" email="" />
-        <Description text="Captures the last ~10s of PvP deaths into a browsable timeline." />
+        <Description text="Records incoming damage and the killing blow on every PvP death, then replays it as a browsable timeline with ability icons and tooltips. /dr to open." />
         <WARInfo>
             <Categories>
                 <Category name="RVR" />
