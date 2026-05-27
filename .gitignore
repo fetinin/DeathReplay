@@ -3,3 +3,6 @@
 .dolt/
 *.db
 .beads-credential-key
+
+# Release archives produced by ./release.sh
+DeathReplay_v*.zip
