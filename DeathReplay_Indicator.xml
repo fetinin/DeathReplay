@@ -3,6 +3,9 @@
     <Scripts>
         <Script file="DeathReplay_Indicator.lua"/>
     </Scripts>
+    <Assets>
+        <Texture name="DeathReplaySkull" file="skull.tga"/>
+    </Assets>
     <Windows>
         <Window name="DeathReplay_Indicator" inherits="EA_Window_Default" movable="true" handleinput="true" savesettings="true" layer="overlay">
             <Size>
@@ -19,16 +22,16 @@
                 <EventHandler event="OnInitialize" function="DeathReplayIndicator.OnWindowInit" />
             </EventHandlers>
             <Windows>
-                <FullResizeImage name="$parentBackground" inherits="EA_FullResizeImage_MetalFill">
+                <DynamicImage name="$parentIcon" texture="DeathReplaySkull" textureScale="0.75" handleinput="false" layer="overlay">
+                    <Size>
+                        <AbsPoint x="48" y="48"/>
+                    </Size>
                     <Anchors>
                         <Anchor point="topleft" relativePoint="topleft" relativeTo="$parent">
                             <AbsPoint x="0" y="0"/>
                         </Anchor>
-                        <Anchor point="bottomright" relativePoint="bottomright" relativeTo="$parent">
-                            <AbsPoint x="0" y="0"/>
-                        </Anchor>
                     </Anchors>
-                </FullResizeImage>
+                </DynamicImage>
             </Windows>
         </Window>
     </Windows>
