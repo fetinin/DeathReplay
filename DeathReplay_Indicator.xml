@@ -7,7 +7,7 @@
         <Texture name="DeathReplaySkull" file="skull.tga"/>
     </Assets>
     <Windows>
-        <Window name="DeathReplay_Indicator" inherits="EA_Window_Default" movable="true" handleinput="true" savesettings="true" layer="overlay">
+        <Window name="DeathReplay_Indicator" inherits="EA_Window_Default" movable="true" handleinput="true" savesettings="true" layer="default">
             <Size>
                 <AbsPoint x="48" y="48" />
             </Size>
@@ -22,7 +22,7 @@
                 <EventHandler event="OnInitialize" function="DeathReplayIndicator.OnWindowInit" />
             </EventHandlers>
             <Windows>
-                <DynamicImage name="$parentIcon" texture="DeathReplaySkull" textureScale="0.75" handleinput="false" layer="overlay">
+                <DynamicImage name="$parentIcon" texture="DeathReplaySkull" textureScale="0.75" handleinput="false" layer="default">
                     <Size>
                         <AbsPoint x="48" y="48"/>
                     </Size>
