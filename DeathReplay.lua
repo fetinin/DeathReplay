@@ -283,6 +283,13 @@ local function resolveIconForAbility(abilityID, abilityName)
     return nil
 end
 
+-- Public icon resolver for the GUI render layer. Lets the timeline/overview
+-- retroactively fill icons that were nil at capture time (pre-feature deaths
+-- or cache misses) using the current runtime + static caches.
+function DeathReplay.ResolveIcon(abilityID, abilityName)
+    return resolveIconForAbility(abilityID, abilityName)
+end
+
 local deathState  = "alive"      -- "alive" | "dead"
 local captureDone = false        -- prevents double-capture on HP=0 re-fires
 

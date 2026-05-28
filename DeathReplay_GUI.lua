@@ -139,6 +139,7 @@ local function aggregateBySkill(d)
             if row == nil then
                 row = {
                     name      = key,
+                    rawName   = e.ability,  -- raw wstring (for retroactive icon resolver); key may be a fallback like "Auto-attack"
                     total     = 0, hits = 0, crits = 0,
                     max       = 0, maxCrit = false,
                     iconNum   = nil,
@@ -190,6 +191,7 @@ local function aggregateBySkill(d)
             _crits     = r.crits,
             _iconNum   = r.iconNum,
             _abilityId = r.abilityId,  -- drives OnRowMouseOver tooltip lookup
+            _ability   = r.rawName,    -- raw wstring; lets the populator retro-resolve a missing icon
         }
     end
 end
@@ -255,6 +257,7 @@ local function populateTimeline(d)
                 _crit     = e.crit and true or false,
                 _iconNum  = e.iconNum,   -- captured at hit-time; nil for cache misses / pre-feature deaths
                 _abilityId = e.abilityId, -- needed by OnRowMouseOver tooltip lookup
+                _ability   = e.ability,   -- raw wstring name; lets the populator retro-resolve a missing icon
             })
         end
     end
@@ -284,11 +287,18 @@ function DeathReplay_GUI.OnRowPopulated()
                 LabelSetFont(rowName .. "Amount", "font_chat_text", WindowUtils.FONT_DEFAULT_TEXT_LINESPACING)
             end
 
-            -- Icon column: render only if we captured an iconNum at hit-time
-            -- (via DeathReplay.lua's GetBuffs(SELF) harvest). Otherwise hide the
-            -- slot so recycled rows don't show a stale texture from another row.
+            -- Icon column: prefer the iconNum captured at hit-time (via
+            -- DeathReplay.lua's GetBuffs(SELF) harvest). When nil/0 -- which
+            -- happens for pre-feature deaths and for abilities the runtime
+            -- cache hadn't seen yet at hit time -- try the live resolver,
+            -- which now also consults the Warbuilder static DB by id and by
+            -- name. Otherwise hide the slot so recycled rows don't show a
+            -- stale texture from another row.
             local iconName = rowName .. "Icon"
             local iconNum = row._iconNum
+            if not (iconNum and iconNum > 0) and DeathReplay.ResolveIcon then
+                iconNum = DeathReplay.ResolveIcon(row._abilityId, row._ability)
+            end
             if iconNum and iconNum > 0 then
                 local tex, ix, iy = GetIconData(iconNum)
                 if tex and tex ~= "" and tex ~= "icon000000" then
@@ -349,12 +359,18 @@ function DeathReplay_GUI.OnOverviewRowPopulated()
                 WindowSetShowing(hitsCritName, false)
             end
 
-            -- Icon column: same scheme as the Timeline row populator. Hide
-            -- the slot when no iconNum was captured for this skill (Auto-
-            -- attacks, direct-damage abilities, abilities whose only hit
-            -- arrived before the buff harvest had seen them).
+            -- Icon column: same scheme as the Timeline row populator. Falls
+            -- back to the live resolver (which now also consults Warbuilder
+            -- by id and by name) when no iconNum was captured for this skill
+            -- -- so pre-feature deaths, direct-damage abilities, and ticks
+            -- whose only hit arrived before the buff harvest get a second
+            -- chance at an icon. Auto-attacks (abilityId=0, name="") still
+            -- correctly fall through to the hidden state.
             local iconName = rowName .. "Icon"
             local iconNum = row._iconNum
+            if not (iconNum and iconNum > 0) and DeathReplay.ResolveIcon then
+                iconNum = DeathReplay.ResolveIcon(row._abilityId, row._ability)
+            end
             if iconNum and iconNum > 0 then
                 local tex, ix, iy = GetIconData(iconNum)
                 if tex and tex ~= "" and tex ~= "icon000000" then
