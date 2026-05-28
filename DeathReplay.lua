@@ -115,6 +115,12 @@ local iconCacheByNameSize = 0
 -- ~1500 unique entries across all 24 PvP careers. Hard-dep on Warbuilder
 -- declared in DeathReplay.mod so the table is guaranteed populated at init.
 local staticAbilityDB = {}
+-- wstring name -> iconNum, name-keyed mirror of staticAbilityDB. Built by
+-- calling GetAbilityName(castId) for each Warbuilder entry at init. Bridges
+-- DoT tick ids (3162, 3787, etc.) to their cast entry: the captured event
+-- carries the tick id and the same wstring name as the cast, so a name lookup
+-- finds the icon when an id lookup against staticAbilityDB misses.
+local staticAbilityDBByName = {}
 
 local effectFieldDumpDone = false
 local function harvestIconsFromActiveEffects()
@@ -170,6 +176,7 @@ end
 local function buildStaticAbilityDB()
     if not Warbuilder or not Warbuilder.Career then return end
     local count = 0
+    local nameCount = 0
     local function ingest(e, careerLine)
         if e and e.ID and staticAbilityDB[e.ID] == nil then
             staticAbilityDB[e.ID] = {
@@ -179,6 +186,18 @@ local function buildStaticAbilityDB()
                 line     = careerLine,
             }
             count = count + 1
+            -- Resolve wstring name via the engine, then mirror by name so that
+            -- DoT tick captures (whose abilityID differs from the cast id but
+            -- whose name matches) can still hit the Warbuilder icon. e.Icon is
+            -- only useful here, not the full meta record; the type/buffType/
+            -- line subtitle data isn't reachable from a tick id anyway.
+            if e.Icon and e.Icon > 0 then
+                local name = GetAbilityName(e.ID)
+                if name and name ~= L"" and staticAbilityDBByName[name] == nil then
+                    staticAbilityDBByName[name] = e.Icon
+                    nameCount = nameCount + 1
+                end
+            end
         end
     end
     for _, career in pairs(Warbuilder.Career) do
@@ -208,7 +227,8 @@ local function buildStaticAbilityDB()
         end
     end
     if DeathReplay.IsDebug() then
-        EA_ChatWindow.Print(L"DR_INIT staticAbilityDB built, entries=" .. towstring(count))
+        EA_ChatWindow.Print(L"DR_INIT staticAbilityDB built, entries=" .. towstring(count)
+            .. L" byName=" .. towstring(nameCount))
     end
 end
 
@@ -250,6 +270,15 @@ local function resolveIconForAbility(abilityID, abilityName)
         if meta and meta.icon and meta.icon > 0 then
             return meta.icon
         end
+    end
+    -- Name fallback against the Warbuilder DB. Bridges tick->cast when the
+    -- player has never observed the debuff on their own bar (so
+    -- iconCacheByName is empty for this name) but Warbuilder has the cast
+    -- entry. Builds on the same wstring-name invariant the runtime name cache
+    -- relies on: engine fires tick and cast with matching .name field.
+    if abilityName and abilityName ~= L"" then
+        local nameIcon = staticAbilityDBByName[abilityName]
+        if nameIcon and nameIcon > 0 then return nameIcon end
     end
     return nil
 end
