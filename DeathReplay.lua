@@ -115,11 +115,14 @@ local iconCacheByNameSize = 0
 -- ~1500 unique entries across all 24 PvP careers. Hard-dep on Warbuilder
 -- declared in DeathReplay.mod so the table is guaranteed populated at init.
 local staticAbilityDB = {}
--- wstring name -> iconNum, name-keyed mirror of staticAbilityDB. Built by
--- calling GetAbilityName(castId) for each Warbuilder entry at init. Bridges
--- DoT tick ids (3162, 3787, etc.) to their cast entry: the captured event
+-- wstring name -> meta record (same table reference as staticAbilityDB[id]).
+-- Built by calling GetAbilityName(castId) for each Warbuilder entry at init.
+-- Bridges DoT tick ids (3162, 3787, etc.) to their cast entry: captured event
 -- carries the tick id and the same wstring name as the cast, so a name lookup
--- finds the icon when an id lookup against staticAbilityDB misses.
+-- finds the meta record (incl. castId, icon, type/buffType/line) when an
+-- id lookup against staticAbilityDB misses. Lets GUI tooltip recover the
+-- engine's ability description via GetAbilityDesc(meta.castId, 40) even when
+-- only the tick id is known.
 local staticAbilityDBByName = {}
 
 local effectFieldDumpDone = false
@@ -179,24 +182,24 @@ local function buildStaticAbilityDB()
     local nameCount = 0
     local function ingest(e, careerLine)
         if e and e.ID and staticAbilityDB[e.ID] == nil then
-            staticAbilityDB[e.ID] = {
+            local meta = {
+                castId   = e.ID,    -- lets GUI call GetAbilityDesc(castId) when only tick id is known
                 icon     = e.Icon,
                 type     = e.Type,
                 buffType = e.BuffType,
                 line     = careerLine,
             }
+            staticAbilityDB[e.ID] = meta
             count = count + 1
-            -- Resolve wstring name via the engine, then mirror by name so that
-            -- DoT tick captures (whose abilityID differs from the cast id but
-            -- whose name matches) can still hit the Warbuilder icon. e.Icon is
-            -- only useful here, not the full meta record; the type/buffType/
-            -- line subtitle data isn't reachable from a tick id anyway.
-            if e.Icon and e.Icon > 0 then
-                local name = GetAbilityName(e.ID)
-                if name and name ~= L"" and staticAbilityDBByName[name] == nil then
-                    staticAbilityDBByName[name] = e.Icon
-                    nameCount = nameCount + 1
-                end
+            -- Resolve wstring name via the engine, then mirror the same meta
+            -- table by name so DoT tick captures (whose abilityID differs from
+            -- the cast id but whose name matches) can recover the full record:
+            -- icon for the row, castId for GetAbilityDesc, and line/type/
+            -- buffType for the subtitle.
+            local name = GetAbilityName(e.ID)
+            if name and name ~= L"" and staticAbilityDBByName[name] == nil then
+                staticAbilityDBByName[name] = meta
+                nameCount = nameCount + 1
             end
         end
     end
@@ -232,13 +235,20 @@ local function buildStaticAbilityDB()
     end
 end
 
--- Accessor for the GUI tooltip layer. Returns { icon, type, buffType, line }
--- for abilities in the Warbuilder database, nil otherwise (NPC, items,
--- renown). Callers must tolerate nil and fall back to engine APIs for name
--- and description.
-function DeathReplay.GetAbilityMeta(abilityID)
-    if not abilityID or abilityID <= 0 then return nil end
-    return staticAbilityDB[abilityID]
+-- Accessor for the GUI tooltip layer. Returns { castId, icon, type, buffType,
+-- line } for abilities in the Warbuilder database, nil otherwise (NPC, items,
+-- renown). When abilityID is a DoT tick (and so misses the by-id table), the
+-- optional abilityName argument retries against the by-name mirror. Callers
+-- must tolerate nil and fall back to engine APIs for name and description.
+function DeathReplay.GetAbilityMeta(abilityID, abilityName)
+    if abilityID and abilityID > 0 then
+        local meta = staticAbilityDB[abilityID]
+        if meta then return meta end
+    end
+    if abilityName and abilityName ~= L"" then
+        return staticAbilityDBByName[abilityName]
+    end
+    return nil
 end
 
 local function resolveIconForAbility(abilityID, abilityName)
@@ -277,8 +287,8 @@ local function resolveIconForAbility(abilityID, abilityName)
     -- entry. Builds on the same wstring-name invariant the runtime name cache
     -- relies on: engine fires tick and cast with matching .name field.
     if abilityName and abilityName ~= L"" then
-        local nameIcon = staticAbilityDBByName[abilityName]
-        if nameIcon and nameIcon > 0 then return nameIcon end
+        local nameMeta = staticAbilityDBByName[abilityName]
+        if nameMeta and nameMeta.icon and nameMeta.icon > 0 then return nameMeta.icon end
     end
     return nil
 end

@@ -610,7 +610,10 @@ function DeathReplay_GUI.OnRowMouseOver()
     local abilityID = row._abilityId
     if not abilityID or abilityID <= 0 then return end
 
-    local meta = DeathReplay.GetAbilityMeta(abilityID)
+    -- Pass the captured wstring name as a fallback key so DoT-tick captures
+    -- (whose abilityID isn't in Warbuilder's by-id table) still recover the
+    -- meta record via the by-name mirror.
+    local meta = DeathReplay.GetAbilityMeta(abilityID, row._ability)
     local name = GetAbilityName(abilityID)
     if name == nil or name == L"" then
         -- Timeline rows expose the display name on row.Name, Overview rows on
@@ -623,7 +626,10 @@ function DeathReplay_GUI.OnRowMouseOver()
             name = L"Ability #" .. towstring(abilityID)
         end
     end
-    local desc = GetAbilityDesc(abilityID, 40)
+    -- GetAbilityDesc on a tick id returns L""; use the cast id from the
+    -- Warbuilder meta when available so DoTs get their real description.
+    local descId = (meta and meta.castId) or abilityID
+    local desc = GetAbilityDesc(descId, 40)
 
     Tooltips.CreateTextOnlyTooltip(SystemData.ActiveWindow.name, nil)
     Tooltips.SetTooltipColor(1, 1, 255, 220, 80)
