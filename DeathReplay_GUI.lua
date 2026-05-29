@@ -287,18 +287,11 @@ function DeathReplay_GUI.OnRowPopulated()
                 LabelSetFont(rowName .. "Amount", "font_chat_text", WindowUtils.FONT_DEFAULT_TEXT_LINESPACING)
             end
 
-            -- Icon column: prefer the iconNum captured at hit-time (via
-            -- DeathReplay.lua's GetBuffs(SELF) harvest). When nil/0 -- which
-            -- happens for pre-feature deaths and for abilities the runtime
-            -- cache hadn't seen yet at hit time -- try the live resolver,
-            -- which now also consults the Warbuilder static DB by id and by
-            -- name. Otherwise hide the slot so recycled rows don't show a
-            -- stale texture from another row.
+            -- Icon column: render only if we captured an iconNum at hit-time
+            -- (via DeathReplay.lua's GetBuffs(SELF) harvest). Otherwise hide the
+            -- slot so recycled rows don't show a stale texture from another row.
             local iconName = rowName .. "Icon"
             local iconNum = row._iconNum
-            if not (iconNum and iconNum > 0) and DeathReplay.ResolveIcon then
-                iconNum = DeathReplay.ResolveIcon(row._abilityId, row._ability)
-            end
             if iconNum and iconNum > 0 then
                 local tex, ix, iy = GetIconData(iconNum)
                 if tex and tex ~= "" and tex ~= "icon000000" then
@@ -359,18 +352,12 @@ function DeathReplay_GUI.OnOverviewRowPopulated()
                 WindowSetShowing(hitsCritName, false)
             end
 
-            -- Icon column: same scheme as the Timeline row populator. Falls
-            -- back to the live resolver (which now also consults Warbuilder
-            -- by id and by name) when no iconNum was captured for this skill
-            -- -- so pre-feature deaths, direct-damage abilities, and ticks
-            -- whose only hit arrived before the buff harvest get a second
-            -- chance at an icon. Auto-attacks (abilityId=0, name="") still
-            -- correctly fall through to the hidden state.
+            -- Icon column: same scheme as the Timeline row populator. Hide
+            -- the slot when no iconNum was captured for this skill (Auto-
+            -- attacks, direct-damage abilities, abilities whose only hit
+            -- arrived before the buff harvest had seen them).
             local iconName = rowName .. "Icon"
             local iconNum = row._iconNum
-            if not (iconNum and iconNum > 0) and DeathReplay.ResolveIcon then
-                iconNum = DeathReplay.ResolveIcon(row._abilityId, row._ability)
-            end
             if iconNum and iconNum > 0 then
                 local tex, ix, iy = GetIconData(iconNum)
                 if tex and tex ~= "" and tex ~= "icon000000" then
