@@ -52,33 +52,19 @@ if [[ "$branch" != "main" && "$FORCE_BRANCH" -eq 0 ]]; then
     exit 2
 fi
 
-# Files that ship inside the addon zip. Append here when you add a new
-# runtime asset; nothing else in the script should need to change. Anchored
-# up here (rather than next to `git archive`) so the cross-check below can
-# bail before any destructive operation.
-RUNTIME_FILES=(
-    DeathReplay.mod
-    DeathReplay.lua
-    DeathReplay_WeaponProcs.lua
-    DeathReplay_GUI.xml
-    DeathReplay_GUI.lua
-    DeathReplay_Indicator.xml
-    DeathReplay_Indicator.lua
-    skull.tga
-)
-
-# Cross-check: every <File name="..."/> in the .mod manifest must also appear
-# in RUNTIME_FILES, or the zip will ship without a file the game tries to load.
-declare -A _in_runtime=()
-for f in "${RUNTIME_FILES[@]}"; do _in_runtime["$f"]=1; done
-missing=()
+# Files that ship inside the addon zip. The engine-loaded files (.lua / .xml)
+# are derived from the .mod manifest's <Files> block, so adding a new runtime
+# Lua file only requires touching DeathReplay.mod. ASSETS holds the items the
+# engine loads outside <Files> (the .mod itself, plus non-Lua assets like
+# textures referenced from XML).
+RUNTIME_FILES=( DeathReplay.mod )
 while IFS= read -r f; do
-    [[ -n "${_in_runtime[$f]:-}" ]] || missing+=("$f")
+    RUNTIME_FILES+=("$f")
 done < <(grep -oE '<File name="[^"]+"' DeathReplay.mod | sed -E 's/.*name="([^"]+)"/\1/')
-if (( ${#missing[@]} > 0 )); then
-    echo "RUNTIME_FILES is missing files declared in DeathReplay.mod <Files>:" >&2
-    printf '    %s\n' "${missing[@]}" >&2
-    echo "Add them to the RUNTIME_FILES array in release.sh and retry." >&2
+RUNTIME_FILES+=( skull.tga )
+
+if (( ${#RUNTIME_FILES[@]} < 3 )); then
+    echo "RUNTIME_FILES derivation produced fewer than 3 files — DeathReplay.mod <Files> block may be malformed." >&2
     exit 1
 fi
 
