@@ -59,6 +59,7 @@ fi
 RUNTIME_FILES=(
     DeathReplay.mod
     DeathReplay.lua
+    DeathReplay_WeaponProcs.lua
     DeathReplay_GUI.xml
     DeathReplay_GUI.lua
     DeathReplay_Indicator.xml

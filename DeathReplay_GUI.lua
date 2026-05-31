@@ -617,6 +617,11 @@ function DeathReplay_GUI.OnRowMouseOver()
     -- Warbuilder meta when available so DoTs get their real description.
     local descId = (meta and meta.castId) or abilityID
     local desc = GetAbilityDesc(descId, 40)
+    -- Weapon-proc abilities (abilityId=0, not in Warbuilder) carry a
+    -- hand-curated description string on the meta record itself.
+    if (desc == nil or desc == L"") and meta and meta.description and meta.description ~= L"" then
+        desc = meta.description
+    end
 
     Tooltips.CreateTextOnlyTooltip(SystemData.ActiveWindow.name, nil)
     Tooltips.SetTooltipColor(1, 1, 255, 220, 80)

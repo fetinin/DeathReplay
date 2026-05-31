@@ -42,6 +42,7 @@
             <Dependency name="Warbuilder" optional="false" forceEnable="true" />
         </Dependencies>
         <Files>
+            <File name="DeathReplay_WeaponProcs.lua" />
             <File name="DeathReplay.lua" />
             <File name="DeathReplay_Indicator.xml" />
             <File name="DeathReplay_Indicator.lua" />

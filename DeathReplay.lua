@@ -246,7 +246,17 @@ function DeathReplay.GetAbilityMeta(abilityID, abilityName)
         if meta then return meta end
     end
     if abilityName and abilityName ~= L"" then
-        return staticAbilityDBByName[abilityName]
+        local nameMeta = staticAbilityDBByName[abilityName]
+        if nameMeta then return nameMeta end
+        -- Hand-curated weapon-proc fallback. Engine reports these with
+        -- abilityId=0 and they are absent from Warbuilder, so a separate table
+        -- (DeathReplay_WeaponProcs.lua) supplies icon + description by name.
+        -- Returned meta intentionally lacks castId/line/type/buffType so the
+        -- GUI subtitle path skips and the description path uses meta.description.
+        local proc = DeathReplay_WeaponProcs and DeathReplay_WeaponProcs.Lookup(abilityName)
+        if proc then
+            return { icon = proc.icon, description = proc.description }
+        end
     end
     return nil
 end
@@ -289,6 +299,13 @@ local function resolveIconForAbility(abilityID, abilityName)
     if abilityName and abilityName ~= L"" then
         local nameMeta = staticAbilityDBByName[abilityName]
         if nameMeta and nameMeta.icon and nameMeta.icon > 0 then return nameMeta.icon end
+    end
+    -- Last resort: hand-curated weapon-proc table. Engine reports these with
+    -- abilityId=0 (no GetAbilityData entry) and Warbuilder doesn't carry item
+    -- enchants, so neither id nor Warbuilder name fallbacks above can resolve.
+    if abilityName and abilityName ~= L"" and DeathReplay_WeaponProcs then
+        local proc = DeathReplay_WeaponProcs.Lookup(abilityName)
+        if proc and proc.icon and proc.icon > 0 then return proc.icon end
     end
     return nil
 end
