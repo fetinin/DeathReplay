@@ -416,6 +416,14 @@ local function captureDeath()
         table.remove(charDeaths)
     end
 
+    -- Flush the event buffer now that this death is captured. The only other
+    -- clear (OnHitPointsUpdated, on reaching full HP) doesn't fire between two
+    -- deaths if the player respawns and dies again without ever topping off --
+    -- so without this, the prior death's hits stay buffered and get re-stamped
+    -- with the next death's deathTime, surfacing as bogus far-negative-dt events
+    -- in the new timeline. Reassigns the upvalue, same as the full-HP clear.
+    recentEvents = {}
+
     if DeathReplayIndicator and DeathReplayIndicator.Recompute then
         DeathReplayIndicator.Recompute()
     end
@@ -446,7 +454,6 @@ local function defaultSavedVariables()
     return {
         version    = SCHEMA_VERSION,
         config     = {
-            bufferWindowSeconds = 10,
             maxDeathsStored     = 5,
             captureMode         = "pvp",
             debug               = false,
