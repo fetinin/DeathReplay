@@ -33,3 +33,34 @@ Released 6/3/2026. Changes since v0.4.2.
   logic: death (`hp == 0`) and respawn (`hp > 0`) detection don't read max
   HP at all, and the full-HP buffer clear keys on the live (debuffed)
   maximum, so it still fires correctly when you heal up under the penalty.
+
+---
+
+# DeathReplay v0.4.2
+
+Released 5/31/2026. Changes since v0.4.1. This release is all about getting
+the right icon and tooltip onto every damage source in a death timeline.
+
+## Improvements
+
+- **DoT tick damage now shows the correct ability icon.** The engine fires a
+  DoT's periodic ticks with a different ability id than the cast that applied
+  it (e.g. Touch of Palsy: cast 8338, tick 3400), so id-only lookups missed
+  them. A name-keyed mirror of the Warbuilder ability database now bridges
+  tick → cast by the shared ability name, so ticks resolve to the parent
+  ability's icon at the moment the hit is captured.
+- **Row tooltips show ability descriptions, including for DoT ticks.** Hovering
+  a timeline row resolves the cast id behind a tick and pulls the engine's
+  ability description for it, so periodic-damage rows get a real description
+  instead of a blank.
+- **Weapon-proc damage resolves both icon and description.** Item enchant /
+  weapon procs report with ability id 0 and aren't in Warbuilder, so a
+  hand-curated proc table (`DeathReplay_WeaponProcs.lua`) now supplies their
+  icon and description by name.
+
+## Notes
+
+- A render-time retroactive icon fallback for pre-existing saved deaths was
+  prototyped during this cycle but reverted before release: fresh captures
+  already resolve icons at hit time, so it only covered old saves and wasn't
+  worth the extra rendering branch.
