@@ -1,4 +1,4 @@
--- DeathReplay v0.4.2 — skeleton, see docs/superpowers/specs/2026-05-15-death-replay-design.md
+-- DeathReplay v0.4.3 — skeleton, see docs/superpowers/specs/2026-05-15-death-replay-design.md
 
 DeathReplay = {}
 DeathReplay_SavedVariables = nil   -- engine populates from disk on load, or leaves nil on first run
@@ -573,7 +573,7 @@ function DeathReplay.OnInitialize()
         -- hit until the next zone change.
         recomputePvpContext()
 
-        EA_ChatWindow.Print(L"DeathReplay v0.4.2 loaded.")
+        EA_ChatWindow.Print(L"DeathReplay v0.4.3 loaded.")
 
         if DeathReplayIndicator and DeathReplayIndicator.Recompute then
             DeathReplayIndicator.Recompute()
