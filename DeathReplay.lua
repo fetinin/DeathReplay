@@ -313,6 +313,14 @@ end
 local deathState  = "alive"      -- "alive" | "dead"
 local captureDone = false        -- prevents double-capture on HP=0 re-fires
 
+-- Handle to the most-recently captured death. Lets OnCombatEvent fold in
+-- "trailing" damage -- hits whose combat events are dispatched just after the
+-- hp=0 update that triggered captureDeath(), so they miss the snapshot
+-- (verified in the wild: a same-instant killing burst, and a DoT tick landing a
+-- second post-capture). Held only between capture and respawn; cleared in
+-- OnHitPointsUpdated on revive.
+local lastCapturedDeath = nil
+
 local function fixZoneName(name)
     -- Quick wstring trim — same pattern as QueueQueuer.FixName. Strip trailing junk control chars.
     if name == nil then return L"" end
@@ -324,11 +332,12 @@ local function fixZoneName(name)
 end
 
 local function captureDeath()
-    -- GetGameTime returns elapsed seconds (sub-second precision). WarBoard
-    -- uses it for session timing — see WarBoard_Session.lua:101 where
-    -- (GetGameTime() - initialClock) is divided directly to get "per second"
-    -- rates. GetComputerTime's unit (ms vs s) is ambiguous on this engine
-    -- build, so we avoid it.
+    -- GetGameTime returns elapsed seconds at whole-second resolution on this
+    -- engine build (observed: combat-event gaps land on exact 0s/1s boundaries,
+    -- never fractional). WarBoard uses it for session timing — see
+    -- WarBoard_Session.lua:101 where (GetGameTime() - initialClock) is divided
+    -- directly to get "per second" rates. GetComputerTime's unit (ms vs s) is
+    -- ambiguous on this engine build, so we avoid it.
     local deathTime = GetGameTime()
     local events = {}
     local killingBlow = nil
@@ -424,6 +433,10 @@ local function captureDeath()
     -- in the new timeline. Reassigns the upvalue, same as the full-HP clear.
     recentEvents = {}
 
+    -- Fold-in target for trailing post-death damage; see OnCombatEvent. Same
+    -- table reference now living at charDeaths[1], so appends persist.
+    lastCapturedDeath = death
+
     if DeathReplayIndicator and DeathReplayIndicator.Recompute then
         DeathReplayIndicator.Recompute()
     end
@@ -481,6 +494,43 @@ function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
     if amount == nil or amount >= 0 then return end
     local abilityName = GetAbilityName(abilityID)
     local iconNum = resolveIconForAbility(abilityID, abilityName)
+    if deathState == "dead" then
+        -- Trailing damage: the killing blow's combat events are sometimes
+        -- dispatched just after the hp=0 update that triggered captureDeath(),
+        -- so they miss the snapshot. Given ordered delivery and that a corpse
+        -- takes no new damage, every event we receive in the dead-window is
+        -- alive-time damage arriving late, in order -- so the LAST one we see is
+        -- the real killing blow. Fold each into the just-saved death (clamped to
+        -- dt=0, "at death", since GetGameTime only resolves to whole seconds)
+        -- and hand it the killing blow; last trailing hit wins, clearing the
+        -- previous holder's *KB* flag.
+        if lastCapturedDeath then
+            for _, ev in ipairs(lastCapturedDeath.events) do
+                if ev.killingBlow then ev.killingBlow = nil end
+            end
+            table.insert(lastCapturedDeath.events, {
+                dt          = 0,
+                kind        = "HIT",
+                ability     = abilityName,
+                abilityId   = abilityID,
+                iconNum     = iconNum,
+                amount      = -amount,
+                crit        = mapping.crit,
+                killingBlow = true,   -- last trailing hit wins
+            })
+            lastCapturedDeath.killingBlow = {
+                kind      = (mapping.crit and "ABILITY_CRITICAL" or "ABILITY_HIT"),
+                ability   = abilityName,
+                abilityId = abilityID,
+                iconNum   = iconNum,
+                amount    = -amount,
+            }
+            if DeathReplayIndicator and DeathReplayIndicator.Recompute then
+                DeathReplayIndicator.Recompute()
+            end
+        end
+        return   -- patched onto the death; do NOT also buffer it (avoids bleed)
+    end
     if DeathReplay.IsDebug() then
         EA_ChatWindow.Print(L"DR_HIT aid=" .. towstring(abilityID)
             .. L" icon=" .. towstring(iconNum or "nil")
@@ -514,8 +564,9 @@ function DeathReplay.OnHitPointsUpdated()
         captureDone = true
         deathState  = "dead"
     elseif deathState == "dead" and hp > 0 then
-        deathState  = "alive"
-        captureDone = false
+        deathState        = "alive"
+        captureDone       = false
+        lastCapturedDeath = nil   -- respawned: stop folding trailing damage
     end
     if hp > 0 and maxHp > 0 and hp >= maxHp and #recentEvents > 0 then
         recentEvents = {}
