@@ -447,6 +447,17 @@ local function captureDeath()
     if killingBlow and killingBlow.ability and killingBlow.ability ~= L"" then
         kbName = killingBlow.ability
     end
+    -- Career suffix, same meta path as the GUI tooltip subtitle. Resolves
+    -- only for abilities in Warbuilder's database; NPC abilities, weapon
+    -- procs and items have no .line, so the name stays bare -- no brackets.
+    local meta = killingBlow
+        and DeathReplay.GetAbilityMeta(killingBlow.abilityId, killingBlow.ability)
+    if meta and meta.line then
+        local career = GetCareerLine(meta.line)
+        if career and career ~= L"" then
+            kbName = kbName .. L" (" .. career .. L")"
+        end
+    end
     EA_ChatWindow.Print(L"[DeathReplay]: Killed by "
         .. CreateHyperLink(L"DeathReplay:open", kbName, { 255, 255, 0 }, {}))
 end
