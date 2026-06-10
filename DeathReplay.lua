@@ -624,6 +624,13 @@ function DeathReplay.OnInitialize()
         -- hit until the next zone change.
         recomputePvpContext()
 
+        -- The GUI window has savesettings="true", so the engine restores its
+        -- shown flag across /reloadui even though the .mod creates it with
+        -- show="false". Lua state doesn't survive the reload, so the restored
+        -- window would be empty; force it closed (and keep state.visible in
+        -- sync) instead.
+        DeathReplay_GUI.Hide()
+
         EA_ChatWindow.Print(L"DeathReplay v0.4.3 loaded.")
 
         if DeathReplayIndicator and DeathReplayIndicator.Recompute then
