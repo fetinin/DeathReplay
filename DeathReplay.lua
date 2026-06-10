@@ -441,7 +441,14 @@ local function captureDeath()
         DeathReplayIndicator.Recompute()
     end
 
-    EA_ChatWindow.Print(L"DeathReplay: capture saved. /dr to view.")
+    -- killingBlow is nil when no HIT made it into the buffer (e.g. fall
+    -- damage or every event filtered out), so the name needs a fallback.
+    local kbName = L"Unknown"
+    if killingBlow and killingBlow.ability and killingBlow.ability ~= L"" then
+        kbName = killingBlow.ability
+    end
+    EA_ChatWindow.Print(CreateHyperLink(L"DeathReplay:open",
+        L"[DeathReplay]: Killed by " .. kbName, { 255, 255, 0 }, {}))
 end
 
 local function isRvrZone(zoneId)
@@ -573,6 +580,18 @@ function DeathReplay.OnHitPointsUpdated()
     end
 end
 
+-- Clicking a CreateHyperLink in chat lands in EA_ChatWindow.OnHyperLinkLButtonUp.
+-- The engine routes every chat link through that one handler, so the original
+-- must be chained for item links and other addons' links to keep working
+-- (same shared-hook pattern as Deathblow2 and Warbuilder).
+local _origOnHyperLinkLButtonUp
+local function onHyperLinkLButtonUp(linkData, flags, x, y)
+    _origOnHyperLinkLButtonUp(linkData, flags, x, y)
+    if towstring(linkData) == L"DeathReplay:open" then
+        DeathReplay_GUI.Show()
+    end
+end
+
 function DeathReplay.OnInitialize()
     local function init()
         if DeathReplay_SavedVariables == nil then
@@ -630,6 +649,11 @@ function DeathReplay.OnInitialize()
         -- window would be empty; force it closed (and keep state.visible in
         -- sync) instead.
         DeathReplay_GUI.Hide()
+
+        -- /reloadui rebuilds EA_ChatWindow too, so re-hooking here never
+        -- stacks the hook twice.
+        _origOnHyperLinkLButtonUp = EA_ChatWindow.OnHyperLinkLButtonUp
+        EA_ChatWindow.OnHyperLinkLButtonUp = onHyperLinkLButtonUp
 
         EA_ChatWindow.Print(L"DeathReplay v0.4.3 loaded.")
 
