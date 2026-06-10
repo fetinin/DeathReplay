@@ -458,10 +458,11 @@ local function captureDeath()
             kbName = kbName .. L" (" .. career .. L")"
         end
     end
-    -- Filter id 21 is the channel Deathblow2 prints its kill lines on; chat
-    -- renders it in the gold-yellow kill-spam color (EA_ChatWindow.Print would
-    -- be plain white). Embedded <LINK> stays clickable either way.
-    TextLogAddEntry("Chat", 21, L"[DeathReplay]: Killed by "
+    -- Filter id 11 is the channel Deathblow2 prints its death-stats line on,
+    -- which chat renders gold-yellow (filter 21, Deathblow's kill line, comes
+    -- out green; EA_ChatWindow.Print would be plain white). Embedded <LINK>
+    -- stays clickable either way.
+    TextLogAddEntry("Chat", 11, L"[DeathReplay]: Killed by "
         .. CreateHyperLink(L"DeathReplay:open", kbName, { 255, 255, 0 }, {}))
 end
 
