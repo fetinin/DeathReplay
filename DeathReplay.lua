@@ -447,8 +447,8 @@ local function captureDeath()
     if killingBlow and killingBlow.ability and killingBlow.ability ~= L"" then
         kbName = killingBlow.ability
     end
-    EA_ChatWindow.Print(CreateHyperLink(L"DeathReplay:open",
-        L"[DeathReplay]: Killed by " .. kbName, { 255, 255, 0 }, {}))
+    EA_ChatWindow.Print(L"[DeathReplay]: Killed by "
+        .. CreateHyperLink(L"DeathReplay:open", kbName, { 255, 255, 0 }, {}))
 end
 
 local function isRvrZone(zoneId)
