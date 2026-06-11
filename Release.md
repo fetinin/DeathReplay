@@ -1,3 +1,40 @@
+# DeathReplay v0.5.0
+
+Released 6/11/2026. Changes since v0.4.3.
+
+## New
+
+- **The death notice in chat is now a clickable link.** On every captured
+  death, `[DeathReplay]: Killed by <ability>` is printed gold-yellow in the
+  chat log (same channel Deathblow2 uses for its death-stats line). The
+  ability name is a yellow hyperlink — click it to open the replay window
+  on that death. When the killing ability is in Warbuilder's database, the
+  attacker's career is appended in brackets, e.g.
+  `Killed by Word of Pain (Sorcerer)`; NPC abilities, weapon procs and
+  items print the bare name. The handler chains the original
+  `EA_ChatWindow.OnHyperLinkLButtonUp`, so item links and other addons'
+  chat links keep working.
+
+## Bug fixes
+
+- **Killing-blow damage no longer goes missing from the replay.** The
+  killing blow's combat event is sometimes dispatched just *after* the
+  hp=0 update that captures the death, so it missed the snapshot — a hit
+  visible on screen and in the combat log but absent from the timeline.
+  Trailing damage received while dead is now folded into the just-saved
+  death (clamped to the death instant) and becomes the killing blow,
+  last hit winning. Hits folded this way can't bleed into the next death.
+- **Replay window no longer reopens empty after `/reloadui`.** The window
+  manifest persisted visibility across UI reloads, so the GUI came back
+  open but with no death loaded. It now closes on reload; reopen with
+  `/dr` as usual.
+
+## Notes
+
+- No saved-variables schema change (still v3); no migration required.
+
+---
+
 # DeathReplay v0.4.3
 
 Released 6/3/2026. Changes since v0.4.2.
