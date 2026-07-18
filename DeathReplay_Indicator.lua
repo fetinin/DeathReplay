@@ -1,4 +1,5 @@
--- DeathReplay_Indicator — small movable on-screen widget; lit when unviewed deaths exist.
+-- DeathReplay_Indicator — small movable on-screen widget; always visible,
+-- click opens the DeathReplay window.
 
 DeathReplayIndicator = {}
 
@@ -16,14 +17,12 @@ local function dr_safe(fn_name, fn)
 end
 
 
+-- The indicator is a permanent screen element (user decision), so this only
+-- enforces visibility. Unviewed-death tinting via a DynamicImage icon remains
+-- on the backlog; callers still poke this after captures/views/resets so the
+-- tint can hook in here later without touching them.
 function DeathReplayIndicator.Recompute()
-    local anyUnviewed = false
-    for _, d in ipairs(DeathReplay.GetCharDeaths()) do
-        if d.viewed == false then anyUnviewed = true; break end
-    end
-    -- v1 simplification: show the widget only when there are unviewed deaths.
-    -- v2 backlog: bring back amber/gray tinting via proper DynamicImage icon.
-    WindowSetShowing("DeathReplay_Indicator", anyUnviewed)
+    WindowSetShowing("DeathReplay_Indicator", true)
 end
 
 function DeathReplayIndicator.OnClick()

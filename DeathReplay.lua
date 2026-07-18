@@ -19,7 +19,19 @@ local function getCharDeaths()
     local chars = DeathReplay_SavedVariables.characters
     local key   = characterKey()
     if chars[key] == nil then chars[key] = { deaths = {} } end
+    -- Either accessor may create the char record first; backfill the list
+    -- the other one seeds.
+    if chars[key].deaths == nil then chars[key].deaths = {} end
     return chars[key].deaths
+end
+
+-- Enemy target-deaths live at characters[key].kills, beside .deaths.
+local function getCharKills()
+    local chars = DeathReplay_SavedVariables.characters
+    local key   = characterKey()
+    if chars[key] == nil then chars[key] = { deaths = {} } end
+    if chars[key].kills == nil then chars[key].kills = {} end
+    return chars[key].kills
 end
 
 -- Public accessor for the GUI / Indicator modules.
@@ -29,6 +41,15 @@ function DeathReplay.GetCharDeaths()
         return {}
     end
     return getCharDeaths()
+end
+
+-- Public accessor for the GUI's Kills view.
+function DeathReplay.GetCharKills()
+    if DeathReplay_SavedVariables == nil
+       or DeathReplay_SavedVariables.characters == nil then
+        return {}
+    end
+    return getCharKills()
 end
 
 function DeathReplay.IsDebug()
@@ -84,6 +105,31 @@ local RVR_ZONES = {
 local isPvpNow = false   -- cached; updated by DeathReplay.OnContextMaybeChanged
 
 local MAX_EVENTS_BUFFERED   = 1000
+
+-- Kill Log tunables. Outgoing damage is buffered per victim (keyed by
+-- objectID) so each enemy has its own timeline ready to snapshot when it dies.
+local MAX_KILL_VICTIMS         = 60    -- cap distinct victim buffers (RvR has many)
+local MAX_KILL_EVENTS_PER_VICTIM = 200 -- cap hits stored per victim
+-- Lazy staleness cutoff. If your damage on a victim has a gap wider than this,
+-- the earlier timeline is a separate/abandoned attempt and is wiped. Doubles
+-- as stale-victim eviction. Bump to 60 if long kite fights false-evict.
+local KILL_STALE_GAP_SECONDS   = 30
+-- GameData.Player.RvRStats.LifetimeDeathBlows increments +1 when YOU land a
+-- killing blow, but the increment and the target-death event can surface in
+-- EITHER order relative to each other. Killing-blow tagging therefore matches
+-- the two signals two-sidedly: a captured death waits this long for a counter
+-- credit, and a counter credit observed with no matching death waits this long
+-- to be claimed by one. 5 seconds because the counter's surfacing latency at
+-- the death instant is unmeasured and integer-second gap math truncates; the
+-- cost is a slightly higher chance of crediting a simultaneous AoE deathblow
+-- on an untargeted victim (~2/10 deathblows have no matching target-death) to
+-- a targeted death -- accepted, crediting stays conservative.
+local KILL_KB_WINDOW_SECONDS   = 5
+-- Trailing fold-in window for combat events that arrive after their victim's
+-- hp=0 target update. Late lethal hits land about a second after the death,
+-- so this stays tight -- independent of the wider credit-matching window.
+local KILL_FOLDIN_WINDOW_SECONDS = 2
+
 local COMBAT_EVENT_KIND = {
     [GameData.CombatEvent.HIT]               = { kind = "HIT", crit = false },
     [GameData.CombatEvent.ABILITY_HIT]       = { kind = "HIT", crit = false },
@@ -466,6 +512,456 @@ local function captureDeath()
         .. CreateHyperLink(L"DeathReplay:open", kbName, { 255, 255, 0 }, {}))
 end
 
+-- ===========================================================================
+-- Kill Log capture. Mirror of the death log for ENEMIES that die while you
+-- have them targeted. Mechanism (empirically verified in-game):
+--   * OUTGOING combat events (objectID != you) are your own hits on a victim;
+--     we buffer them per victim so each has a ready timeline.
+--   * PLAYER_TARGET_UPDATED fires on your hostile target's HP changes (event-
+--     driven, no polling). At death it fires with id>0 & hp==0, victim identity
+--     still readable, ~1s before the corpse auto-deselects.
+--   * Death rule: same id as last update, was hp>0, now hp==0 -> snapshot.
+-- Object ids are PER-SPAWN, so each death is a distinct record even for a
+-- repeat-dying name.
+-- ===========================================================================
+
+local HOSTILE = "selfhostiletarget"
+
+-- Per-victim outgoing-damage buffers, keyed by objectID. Each is
+-- { events = {…}, lastEventTime = <GetComputerTime secs> }. victimCount is a
+-- maintained counter so we never need an O(n) walk just to test the cap.
+local victimBuffers = {}
+local victimCount   = 0
+
+-- Last seen hostile-target state, for the >0 -> 0 death transition.
+local lastTargetId = 0
+local lastTargetHp = -1   -- -1 = unknown; UnitHealth is a 0..100 percent
+
+-- Just-captured kill records, keyed by victim objectID, held for a short
+-- trailing window so a lethal hit whose WORLD_OBJ_COMBAT_EVENT arrives AFTER the
+-- hp=0 PLAYER_TARGET_UPDATED (the common ordering) folds into the ALREADY-stored
+-- record instead of landing in a fresh orphan buffer for the now-dead id.
+-- Keyed by objectID because several enemies can die within one window and each
+-- must catch only its OWN late hit. Entry shapes (wallTime = GetComputerTime
+-- secs at the death): { record = <stored kill>, wallTime } folds late hits in;
+-- { ghost = <UNstored kill>, wallTime } is a death with none of our damage --
+-- stored only if our late hit arrives inside the window, discarded otherwise.
+-- Pruned lazily, no timer.
+local recentKills = {}
+
+local function wipeVictim(objectID)
+    if victimBuffers[objectID] ~= nil then
+        victimBuffers[objectID] = nil
+        victimCount = victimCount - 1
+    end
+end
+
+-- GetComputerTime() is INTEGER SECONDS SINCE MIDNIGHT (not milliseconds --
+-- verified in-game), so a naive (now - then) goes negative across the midnight
+-- boundary; add a day.
+local function killGapSeconds(fromTime, toTime)
+    local dt = toTime - fromTime
+    if dt < 0 then dt = dt + 86400 end
+    return dt
+end
+
+-- Drop recentKills entries whose trailing fold-in window has closed. Called from
+-- the same handlers that already fire (a new capture, an outgoing hit) -- no
+-- timer.
+local function pruneRecentKills(now)
+    for objectID, entry in pairs(recentKills) do
+        if killGapSeconds(entry.wallTime, now) > KILL_FOLDIN_WINDOW_SECONDS then
+            recentKills[objectID] = nil
+        end
+    end
+end
+
+-- Killing-blow tag machinery. ---------------------------------------------------
+-- Guarded read of the lifetime killing-blow counter. Returns nil when RvRStats
+-- isn't populated yet (early load) so callers can tell "unknown" from a real 0.
+-- Deliberately NOT LifetimeKills -- that counter does not move in scenarios.
+local function readDeathBlows()
+    local rv = GameData.Player and GameData.Player.RvRStats
+    if rv == nil then return nil end
+    return rv.LifetimeDeathBlows or 0
+end
+
+-- Killing-blow state: two-sided matching between LifetimeDeathBlows increments
+-- and captured target-deaths. The two signals surface in either order, so each
+-- side that arrives without its counterpart waits (bounded by
+-- KILL_KB_WINDOW_SECONDS) for the other. A one-sided baseline cannot work
+-- here: when the counter bumps BEFORE the death event, any poke landing in
+-- between observes the transition with no pending to credit, and the capture
+-- that follows would never see the counter move again.
+local lastSeenDb = nil   -- last successfully read LifetimeDeathBlows; nil until first read
+-- Counter increments observed with no open pending kill to credit. Each entry
+-- is the GetComputerTime stamp of the observation; a death captured inside the
+-- window consumes the oldest one, otherwise the credit expires unclaimed.
+local unclaimedDbCredits = {}
+-- Kill records awaiting a counter credit. Each entry:
+--   { record = <the stored kill table ref>, wallTime = <GetComputerTime secs
+--     at capture, or at ghost materialization> }.
+-- We hold the record TABLE (not a charKills index) so a FIFO eviction can't make
+-- us tag the wrong record; mutating an evicted-but-referenced table is harmless.
+-- Ordered oldest-first so a surfaced increment is credited FIFO.
+local pendingKills = {}
+
+-- Reconcile the DeathBlows counter against pending kills. Called from events
+-- that already fire (renown poke primarily; also target updates), so there is
+-- NO OnUpdate polling timer. Each observed counter increment credits the
+-- OLDEST pending kill whose window is still open; credits are matched BEFORE
+-- pendings expire, so a credit and its death observed in the same poke still
+-- pair up. An increment with no open pending is parked in unclaimedDbCredits
+-- for a death that surfaces later. Pendings past the window resolve as assist
+-- (record.isKillingBlow stays false); parked credits past the window expire.
+local function resolveKbState()
+    local db  = readDeathBlows()
+    local now = GetComputerTime()
+    if db ~= nil then
+        if lastSeenDb == nil then
+            -- First successful read is the baseline; nothing to credit.
+            lastSeenDb = db
+        elseif db > lastSeenDb then
+            local jump = db - lastSeenDb
+            if jump > 10 then
+                -- A jump this large is a stats resync (e.g. RvRStats
+                -- repopulating after a glitch), not kill credit; rebase
+                -- without crediting anything.
+                jump = 0
+            end
+            for _ = 1, jump do
+                -- pendingKills is ordered oldest-first, so the first entry
+                -- still inside its window is the oldest creditable one;
+                -- expired entries are skipped here and reaped below.
+                local credited = false
+                for i = 1, #pendingKills do
+                    local p = pendingKills[i]
+                    if killGapSeconds(p.wallTime, now) <= KILL_KB_WINDOW_SECONDS then
+                        p.record.isKillingBlow = true
+                        table.remove(pendingKills, i)
+                        credited = true
+                        if DeathReplay.IsDebug() then
+                            EA_ChatWindow.Print(L"DR_KILL tag=killingblow victim=" .. (p.record.victimName or L"?")
+                                .. L" db=" .. towstring(tostring(db))
+                                .. L" gap=" .. towstring(killGapSeconds(p.wallTime, now)))
+                        end
+                        break
+                    end
+                end
+                if not credited then
+                    unclaimedDbCredits[#unclaimedDbCredits + 1] = now
+                    if DeathReplay.IsDebug() then
+                        EA_ChatWindow.Print(L"DR_KILL credit-unclaimed db=" .. towstring(tostring(db))
+                            .. L" parked=" .. towstring(#unclaimedDbCredits))
+                    end
+                end
+            end
+            lastSeenDb = db
+        elseif db < lastSeenDb then
+            -- Counter went backwards (stats resync); rebase, no credit.
+            lastSeenDb = db
+        end
+    end
+    local i = 1
+    while i <= #pendingKills do
+        local p = pendingKills[i]
+        if killGapSeconds(p.wallTime, now) > KILL_KB_WINDOW_SECONDS then
+            if DeathReplay.IsDebug() then
+                EA_ChatWindow.Print(L"DR_KILL tag=assist victim=" .. (p.record.victimName or L"?")
+                    .. L" db=" .. towstring(tostring(db))
+                    .. L" gap=" .. towstring(killGapSeconds(p.wallTime, now)))
+            end
+            table.remove(pendingKills, i)
+        else
+            i = i + 1
+        end
+    end
+    i = 1
+    while i <= #unclaimedDbCredits do
+        if killGapSeconds(unclaimedDbCredits[i], now) > KILL_KB_WINDOW_SECONDS then
+            table.remove(unclaimedDbCredits, i)
+        else
+            i = i + 1
+        end
+    end
+end
+
+-- Attach the killing-blow verdict path to a freshly stored kill record:
+-- consume the oldest still-valid parked credit if one exists (the counter
+-- bumped before this death surfaced), otherwise queue the record to await a
+-- future increment. Callers run resolveKbState() first so a counter
+-- transition in the same dispatch is already parked when this looks.
+local function claimOrPendKill(record, now)
+    for i = 1, #unclaimedDbCredits do
+        if killGapSeconds(unclaimedDbCredits[i], now) <= KILL_KB_WINDOW_SECONDS then
+            table.remove(unclaimedDbCredits, i)
+            record.isKillingBlow = true
+            if DeathReplay.IsDebug() then
+                EA_ChatWindow.Print(L"DR_KILL tag=killingblow victim=" .. (record.victimName or L"?")
+                    .. L" via=parked-credit db=" .. towstring(tostring(lastSeenDb)))
+            end
+            return
+        end
+    end
+    pendingKills[#pendingKills + 1] = { record = record, wallTime = now }
+end
+
+-- Drop every victim whose last hit is older than the stale cutoff. Runs only
+-- inside handlers that already fire -- no timer.
+local function evictStaleVictims(now)
+    for objectID, buf in pairs(victimBuffers) do
+        if killGapSeconds(buf.lastEventTime, now) > KILL_STALE_GAP_SECONDS then
+            victimBuffers[objectID] = nil
+            victimCount = victimCount - 1
+        end
+    end
+end
+
+-- Safety valve for a huge simultaneous fight: evict the single stalest victim
+-- so a genuinely new one fits under MAX_KILL_VICTIMS.
+local function evictStalestVictim(now)
+    local worstId, worstGap = nil, -1
+    for objectID, buf in pairs(victimBuffers) do
+        local gap = killGapSeconds(buf.lastEventTime, now)
+        if gap > worstGap then worstGap, worstId = gap, objectID end
+    end
+    if worstId ~= nil then
+        victimBuffers[worstId] = nil
+        victimCount = victimCount - 1
+    end
+end
+
+-- Append one outgoing hit to its victim's buffer. mapping is the resolved
+-- COMBAT_EVENT_KIND entry (always a HIT here). Handles the stale-gap wipe and
+-- the buffer/victim caps.
+local function pushKillEvent(objectID, amount, mapping, abilityID)
+    local now = GetComputerTime()
+    local buf = victimBuffers[objectID]
+    if buf == nil then
+        if victimCount >= MAX_KILL_VICTIMS then
+            evictStaleVictims(now)
+            if victimCount >= MAX_KILL_VICTIMS then evictStalestVictim(now) end
+        end
+        buf = { events = {}, lastEventTime = now }
+        victimBuffers[objectID] = buf
+        victimCount = victimCount + 1
+    elseif killGapSeconds(buf.lastEventTime, now) > KILL_STALE_GAP_SECONDS then
+        -- The prior timeline is an abandoned attempt on this same spawn; wipe
+        -- it before recording the fresh damage.
+        buf.events = {}
+    end
+    buf.lastEventTime = now
+
+    local abilityName = GetAbilityName(abilityID)
+    local iconNum     = resolveIconForAbility(abilityID, abilityName)
+    local evs = buf.events
+    if #evs >= MAX_KILL_EVENTS_PER_VICTIM then
+        table.remove(evs, 1)
+    end
+    -- Two clocks, deliberate: .t uses GetGameTime (monotonic whole seconds),
+    -- matching the death log's event stamps, so dt = t - deathTime works the
+    -- same for both record kinds. Only the wall-clock gap math needs
+    -- GetComputerTime + its rollover guard.
+    evs[#evs + 1] = {
+        kind      = mapping.kind,
+        crit      = mapping.crit,
+        amount    = -amount,
+        abilityId = abilityID,
+        ability   = abilityName,   -- may be empty wstring if unresolvable
+        iconNum   = iconNum,       -- may be nil if cache miss
+        t         = GetGameTime(),
+    }
+end
+
+local function storeKill(kill)
+    local charKills = getCharKills()
+    table.insert(charKills, 1, kill)
+    while #charKills > DeathReplay_SavedVariables.config.maxKillsStored do
+        table.remove(charKills)
+    end
+end
+
+-- Snapshot a dead victim's buffer into a kill record. Reads name/career/level
+-- NOW (on the death event) because the client auto-clears the target ~1s
+-- later. Kill records keep the death record's field shape -- the GUI renders
+-- both with the same code -- so do not diverge the event fields.
+-- A death with NO damage of ours (never hit it, or last hit older than the
+-- stale cutoff) is NOT stored -- witnessed kills must not appear in the log.
+local function captureKill(objectID)
+    local deathTime = GetGameTime()
+    local buf       = victimBuffers[objectID]
+
+    local events      = {}
+    local killingBlow = nil
+    if buf and #buf.events > 0
+       and killGapSeconds(buf.lastEventTime, GetComputerTime()) <= KILL_STALE_GAP_SECONDS then
+        for _, e in ipairs(buf.events) do
+            table.insert(events, {
+                dt        = e.t - deathTime,   -- negative: seconds before death
+                kind      = e.kind,
+                ability   = e.ability,
+                abilityId = e.abilityId,
+                iconNum   = e.iconNum,
+                amount    = e.amount,
+                crit      = e.crit,
+            })
+        end
+        -- All buffered outgoing events are HITs, so the last one is the
+        -- killing blow.
+        local last = events[#events]
+        last.killingBlow = true
+        killingBlow = {
+            kind      = (last.crit and "ABILITY_CRITICAL" or "ABILITY_HIT"),
+            ability   = last.ability,
+            abilityId = last.abilityId,
+            iconNum   = last.iconNum,
+            amount    = last.amount,
+        }
+    end
+
+    local kill = {
+        timestamp   = deathTime,
+        zone        = fixZoneName(GetZoneName(GameData.Player.zone)),
+        zoneId      = GameData.Player.zone,
+        context     = (GameData.Player.isInScenario and "scenario" or "rvr"),
+        viewed      = false,
+        victimName  = fixZoneName(TargetInfo:UnitName(HOSTILE)),   -- strips ^M/^F
+        career      = TargetInfo:UnitCareerName(HOSTILE),
+        level       = TargetInfo:UnitLevel(HOSTILE),
+        -- killingBlow is the last-hit EVENT table {kind,ability,...}, mirroring
+        -- the death record. isKillingBlow is the SEPARATE boolean tag: true =
+        -- YOU landed the finishing blow, false = assist / teammate finished it.
+        -- It starts false and flips when a LifetimeDeathBlows increment is
+        -- matched to this record (either side of the death may surface first).
+        -- Do NOT conflate the two fields.
+        killingBlow   = killingBlow,
+        isKillingBlow = false,
+        events        = events,
+    }
+
+    -- Prune first so the map stays bounded by kills-per-window.
+    pruneRecentKills(GetComputerTime())
+
+    if #events > 0 then
+        storeKill(kill)
+        -- Killing-blow verdict: reconcile the counter FIRST so an increment
+        -- that surfaced before this death event is parked as a credit, then
+        -- either consume a parked credit immediately or queue the record to
+        -- await one.
+        resolveKbState()
+        claimOrPendKill(kill, GetComputerTime())
+        -- Remember this record for a short trailing window so the actual
+        -- killing hit -- whose combat event commonly arrives AFTER this hp=0
+        -- capture -- folds into THIS record instead of a fresh orphan buffer
+        -- for the now-dead id.
+        recentKills[objectID] = { record = kill, wallTime = GetComputerTime() }
+    else
+        -- No damage of ours -> do NOT store the record. Keep it as a GHOST for
+        -- the fold-in window instead: when the finishing hit is our ONLY recent
+        -- hit, its combat event commonly lags the hp=0 update, so at this point
+        -- the buffer is still empty even though the kill is ours. If that hit
+        -- arrives within the window, the ghost is materialized into a stored
+        -- record; otherwise it evaporates and nothing is logged. A killing-blow
+        -- credit that surfaces before materialization is parked in
+        -- unclaimedDbCredits and consumed at materialization.
+        recentKills[objectID] = {
+            ghost    = kill,
+            wallTime = GetComputerTime(),
+        }
+    end
+
+    -- Consumed; per-spawn id won't recur for a different unit, so free it.
+    wipeVictim(objectID)
+
+    if DeathReplay.IsDebug() then
+        EA_ChatWindow.Print(L"DR_KILL victim=" .. kill.victimName
+            .. L" lvl=" .. towstring(tostring(kill.level))
+            .. L" hits=" .. towstring(#events)
+            .. L" stored=" .. towstring(tostring(#events > 0))
+            .. L" kb=" .. towstring(killingBlow and tostring(killingBlow.amount) or "none")
+            .. L" db=" .. towstring(tostring(readDeathBlows()))
+            .. L" lastSeen=" .. towstring(tostring(lastSeenDb))
+            .. L" unclaimed=" .. towstring(#unclaimedDbCredits))
+    end
+end
+
+-- Fold a late lethal hit into an already-captured kill record: the killing
+-- hit's combat event usually lands AFTER the hp=0 target update that triggered
+-- the capture, so it would otherwise miss the snapshot. Append it as a new HIT
+-- and hand it the killing blow; the previous holder's *KB* flag is cleared so
+-- the latest trailing hit always wins. dt (GetGameTime relative to
+-- record.timestamp) is clamped forward -- never earlier than the last stored
+-- event, never negative -- to keep the timeline monotonic. An EMPTY events[]
+-- (witnessed kill) is fine: the late hit is still YOUR blow that killed it, so
+-- it becomes both the first event and the killing blow.
+local function foldLateHitIntoKill(record, amount, mapping, abilityID)
+    local abilityName = GetAbilityName(abilityID)
+    local iconNum     = resolveIconForAbility(abilityID, abilityName)
+    for _, ev in ipairs(record.events) do
+        if ev.killingBlow then ev.killingBlow = nil end
+    end
+    local dt   = GetGameTime() - record.timestamp
+    local last = record.events[#record.events]
+    if last and last.dt and dt < last.dt then dt = last.dt end
+    if dt < 0 then dt = 0 end
+    table.insert(record.events, {
+        dt          = dt,
+        kind        = mapping.kind,
+        ability     = abilityName,
+        abilityId   = abilityID,
+        iconNum     = iconNum,
+        amount      = -amount,
+        crit        = mapping.crit,
+        killingBlow = true,   -- latest trailing hit wins
+    })
+    record.killingBlow = {
+        kind      = (mapping.crit and "ABILITY_CRITICAL" or "ABILITY_HIT"),
+        ability   = abilityName,
+        abilityId = abilityID,
+        iconNum   = iconNum,
+        amount    = -amount,
+    }
+    if DeathReplay.IsDebug() then
+        EA_ChatWindow.Print(L"DR_KILL foldin victim=" .. (record.victimName or L"?")
+            .. L" amount=" .. towstring(tostring(-amount)))
+    end
+end
+
+-- Hostile-target watch. Fires on HP changes as well as target switches, so it
+-- is fully event-driven. UnitHealth is a 0..100 PERCENT; id==0 means no target,
+-- so every check gates on id>0.
+function DeathReplay.OnTargetUpdated()
+    if not isPvpNow then return end
+    -- Piggyback poke: this fires on every target HP change (frequent in combat),
+    -- so it reconciles killing-blow credit state without any dedicated timer.
+    resolveKbState()
+    local id = TargetInfo:UnitEntityId(HOSTILE) or 0
+    local hp = TargetInfo:UnitHealth(HOSTILE)   -- 0..100 percent, may be nil
+
+    if id > 0 and id == lastTargetId and lastTargetHp ~= nil
+       and lastTargetHp > 0 and hp == 0 then
+        -- It just died. The client auto-clears a dead target ~1s later, so
+        -- capture (and read the victim's identity) right now.
+        captureKill(id)
+    elseif id > 0 and hp == 100 and victimBuffers[id] ~= nil then
+        -- Full-HP reset: target seen back at full HP (retarget or heal to 100)
+        -- -> the buffered damage did not contribute to a kill; wipe it so a
+        -- later kill's timeline holds only post-reset damage.
+        wipeVictim(id)
+    end
+
+    lastTargetId = id
+    lastTargetHp = hp
+end
+
+-- Renown credit poke. objectID here is ALWAYS the recipient (you), never
+-- the victim, and it fires very frequently in combat (~117x/scenario) -- useless
+-- as a death trigger, but the natural, cheap "re-read LifetimeDeathBlows now"
+-- signal, so this is where most killing-blow credits are actually observed.
+function DeathReplay.OnRenownGained(objectID, amount)
+    resolveKbState()
+end
+
 local function isRvrZone(zoneId)
     return RVR_ZONES[zoneId] == true
 end
@@ -482,6 +978,10 @@ local function isDefenderPlayer(objectID)
 end
 
 function DeathReplay.OnContextMaybeChanged()
+    -- Deliberately NO kill-state flush here: the stale-gap eviction is the only
+    -- staleness mechanism for victim buffers (per-spawn object ids don't
+    -- collide in practice), and pendingKills/recentKills self-expire in their
+    -- own short windows.
     recomputePvpContext()
 end
 
@@ -490,6 +990,7 @@ local function defaultSavedVariables()
         version    = SCHEMA_VERSION,
         config     = {
             maxDeathsStored     = 5,
+            maxKillsStored      = 20,
             captureMode         = "pvp",
             debug               = false,
         },
@@ -507,13 +1008,47 @@ end
 
 function DeathReplay.OnCombatEvent(objectID, amount, combatEvent, abilityID)
     if not isPvpNow then return end
-    if not isDefenderPlayer(objectID) then return end
     local mapping = COMBAT_EVENT_KIND[combatEvent]
     if mapping == nil then return end       -- v1 ignores misses and unknowns
-    -- Engine reuses HIT/ABILITY_HIT/CRITICAL/ABILITY_CRITICAL for both incoming
-    -- damage (amount < 0) and incoming heals (amount > 0). v1 captures damage
-    -- only; same sign-based DAMAGE/HEAL split used in wsct.lua:515-527.
+    -- Engine reuses HIT/ABILITY_HIT/CRITICAL/ABILITY_CRITICAL for both damage
+    -- (amount < 0) and heals (amount > 0); the sign is the only damage/heal
+    -- discriminator. We capture damage only.
     if amount == nil or amount >= 0 then return end
+    -- objectID != you => this is your OUTGOING hit and objectID is the victim's
+    -- entity id (its abilityID is your own spellbook). Buffer it for the Kill
+    -- Log; the death log below only wants the incoming branch.
+    if not isDefenderPlayer(objectID) then
+        -- Late killing-hit fold-in: if this victim was just captured (its hp=0
+        -- target update beat this combat event, the common ordering) and we're
+        -- still inside the trailing window, patch the hit onto the STORED record
+        -- rather than opening a fresh orphan buffer for the now-dead id.
+        local capd = recentKills[objectID]
+        if capd ~= nil then
+            if killGapSeconds(capd.wallTime, GetComputerTime()) <= KILL_FOLDIN_WINDOW_SECONDS then
+                if capd.ghost ~= nil then
+                    -- The death itself produced no stored record (no buffered
+                    -- damage), but this late hit proves the kill involved us:
+                    -- materialize the ghost. The KB verdict window is anchored
+                    -- at NOW, not at the death: a credit that surfaced between
+                    -- the death and this hit was parked in unclaimedDbCredits
+                    -- (reconcile first so a same-dispatch bump is parked too)
+                    -- and is consumed here.
+                    local record = capd.ghost
+                    foldLateHitIntoKill(record, amount, mapping, abilityID)
+                    storeKill(record)
+                    resolveKbState()
+                    claimOrPendKill(record, GetComputerTime())
+                    recentKills[objectID] = { record = record, wallTime = capd.wallTime }
+                else
+                    foldLateHitIntoKill(capd.record, amount, mapping, abilityID)
+                end
+                return
+            end
+            recentKills[objectID] = nil   -- window closed; treat as ordinary damage
+        end
+        pushKillEvent(objectID, amount, mapping, abilityID)
+        return
+    end
     local abilityName = GetAbilityName(abilityID)
     local iconNum = resolveIconForAbility(abilityID, abilityName)
     if deathState == "dead" then
@@ -618,6 +1153,9 @@ function DeathReplay.OnInitialize()
         if DeathReplay_SavedVariables.config.debug == nil then
             DeathReplay_SavedVariables.config.debug = false
         end
+        if DeathReplay_SavedVariables.config.maxKillsStored == nil then
+            DeathReplay_SavedVariables.config.maxKillsStored = 20
+        end
 
         -- Migration v1/v2 -> v3: deaths used to live at the root as one flat
         -- account-wide list; v3 buckets them per character under .characters.
@@ -642,6 +1180,13 @@ function DeathReplay.OnInitialize()
         DeathReplay.DebugPrint(L"DR_VERIFY registered DeathReplay.OnCombatEvent for combat events")
 
         RegisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
+
+        -- Kill Log: hostile-target HP watch (event-driven, no polling timer).
+        RegisterEventHandler(SystemData.Events.PLAYER_TARGET_UPDATED, "DeathReplay.OnTargetUpdated")
+
+        -- Renown gains are the frequent, cheap poke that resolves pending
+        -- killing-blow tags. No polling timer.
+        RegisterEventHandler(SystemData.Events.WORLD_OBJ_RENOWN_GAINED, "DeathReplay.OnRenownGained")
 
         RegisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
         -- Seed iconCache with whatever's currently active so a hit that lands
@@ -691,6 +1236,10 @@ function DeathReplay.OnShutdown()
 
     UnregisterEventHandler(SystemData.Events.PLAYER_CUR_HIT_POINTS_UPDATED, "DeathReplay.OnHitPointsUpdated")
 
+    UnregisterEventHandler(SystemData.Events.PLAYER_TARGET_UPDATED, "DeathReplay.OnTargetUpdated")
+
+    UnregisterEventHandler(SystemData.Events.WORLD_OBJ_RENOWN_GAINED, "DeathReplay.OnRenownGained")
+
     UnregisterEventHandler(SystemData.Events.PLAYER_EFFECTS_UPDATED, "DeathReplay.OnEffectsUpdated")
 end
 
@@ -715,14 +1264,30 @@ function DeathReplay.HandleSlash(input)
         local list = getCharDeaths()
         local n = #list
         for i = #list, 1, -1 do list[i] = nil end
-        recentEvents = {}
+        -- Empty kills in place so the GUI's table ref stays valid. Drop
+        -- pendingKills/recentKills/unclaimedDbCredits too, so a still-pending
+        -- verdict or a late-hit fold-in can't mutate a record on the now-wiped
+        -- list. lastSeenDb deliberately survives: it mirrors a lifetime
+        -- counter, not session records, and resetting it would only force a
+        -- fresh (credit-free) baseline read. victimBuffers deliberately stay:
+        -- they are live in-flight timelines, not stored captures, and
+        -- self-evict on the stale gap. The skull badge is deaths-only, so
+        -- kills need no indicator work.
+        local kills = getCharKills()
+        local kn = #kills
+        for i = #kills, 1, -1 do kills[i] = nil end
+        pendingKills       = {}
+        unclaimedDbCredits = {}
+        recentKills        = {}
+        recentEvents       = {}
         if DeathReplay_GUI and DeathReplay_GUI.Render then
             DeathReplay_GUI.Render()
         end
         if DeathReplayIndicator and DeathReplayIndicator.Recompute then
             DeathReplayIndicator.Recompute()
         end
-        EA_ChatWindow.Print(L"DeathReplay: cleared " .. towstring(n) .. L" captured death(s).")
+        EA_ChatWindow.Print(L"DeathReplay: cleared " .. towstring(n)
+            .. L" captured death(s) and " .. towstring(kn) .. L" kill(s).")
         return
     end
     if DeathReplay_GUI and DeathReplay_GUI.Toggle then

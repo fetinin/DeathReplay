@@ -38,6 +38,7 @@ end
 
 local state = {
     visible               = false,
+    currentMode           = "deaths", -- "deaths" | "kills"; default 'deaths' on Show()
     currentIndex          = 1,
     sortColumn            = "Time",   -- "Time" | "Amount"
     sortDirection         = "desc",   -- "asc" | "desc"
@@ -82,7 +83,21 @@ local function applyTabVisibility()
     ButtonSetPressedFlag("DeathReplay_GUITabsOverview", not onTimeline)
 end
 
-local function deaths()
+-- Reflect state.currentMode on the footer Deaths/Kills toggle. Called from
+-- both Render() branches so the active mode stays lit even on an empty list.
+local function applyModeButtons()
+    local onKills = (state.currentMode == "kills")
+    ButtonSetPressedFlag("DeathReplay_GUIModesKills", onKills)
+    ButtonSetPressedFlag("DeathReplay_GUIModesDeaths", not onKills)
+end
+
+-- Active record list for the current mode: the whole window (title counter,
+-- nav label, timeline, overview) follows the Deaths/Kills toggle. Kill records
+-- share the death record's event shape, so both render through the same code.
+local function records()
+    if state.currentMode == "kills" then
+        return DeathReplay.GetCharKills()
+    end
     return DeathReplay.GetCharDeaths()
 end
 
@@ -231,7 +246,12 @@ local function sortOverview()
     end)
 end
 
-local function populateTimeline(d)
+-- allowKB gates the " *KB*" last-hit marker. Deaths mode always passes true
+-- (the record's killingBlow event is the blow that killed the player). Kills
+-- mode passes true only when the player actually landed the finishing blow
+-- (record.isKillingBlow); on assists the last-hit event still carries
+-- killingBlow=true, so the marker must be suppressed here.
+local function populateTimeline(d, allowKB)
     DeathReplay_GUI.Listdata = {}
     displayOrder = {}
     if d == nil then return end
@@ -246,7 +266,7 @@ local function populateTimeline(d)
             -- Crit-ness is conveyed by bolding the Amount cell in
             -- OnRowPopulated; Flags now only carries the killing-blow marker.
             local flags = L""
-            if e.killingBlow then flags = L" *KB*" end
+            if e.killingBlow and allowKB then flags = L" *KB*" end
             table.insert(DeathReplay_GUI.Listdata, {
                 Time      = dtText,
                 Name      = abilityDisplayName(e.ability, e.abilityId),
@@ -390,14 +410,21 @@ end
 local OVERVIEW_SORT_COLS = { [1] = "Skill", [2] = "Total", [3] = "Hits", [4] = "Avg", [5] = "Max" }
 
 function DeathReplay_GUI.Render()
-    local list = deaths()
-    DeathReplay.DebugPrint(L"DR_DEBUG Render: deaths=" .. towstring(#list))
+    local list = records()
+    DeathReplay.DebugPrint(L"DR_DEBUG Render: mode=" .. towstring(state.currentMode)
+                           .. L" records=" .. towstring(#list))
+    applyModeButtons()
     if #list == 0 then
         LabelSetText("DeathReplay_GUITitleBarText", L"DeathReplay")
         LabelSetText("DeathReplay_GUINavLabel", L"")
         LabelSetTextColor("DeathReplay_GUINavLabel", 255, 255, 255)
-        LabelSetText("DeathReplay_GUIEmptyHint",
-            L"No deaths captured yet. Die in a scenario or RvR zone to capture your first replay.")
+        if state.currentMode == "kills" then
+            LabelSetText("DeathReplay_GUIEmptyHint",
+                L"No kills captured yet. Kill an enemy while it is targeted to capture your first kill.")
+        else
+            LabelSetText("DeathReplay_GUIEmptyHint",
+                L"No deaths captured yet. Die in a scenario or RvR zone to capture your first replay.")
+        end
         LabelSetTextColor("DeathReplay_GUIEmptyHint", 255, 255, 255)
         WindowSetShowing("DeathReplay_GUITimeline", false)
         WindowSetShowing("DeathReplay_GUIEmptyHint", true)
@@ -419,15 +446,29 @@ function DeathReplay_GUI.Render()
     ButtonSetDisabledFlag("DeathReplay_GUIPrev", state.currentIndex <= 1)
     ButtonSetDisabledFlag("DeathReplay_GUINext", state.currentIndex >= #list)
     local d = list[state.currentIndex]
-    local kbName = L"unknown"
-    if d.killingBlow then
-        kbName = abilityDisplayName(d.killingBlow.ability, d.killingBlow.abilityId)
-    end
 
     LabelSetText("DeathReplay_GUITitleBarText",
         L"DeathReplay   " .. towstring(state.currentIndex) .. L"/" .. towstring(#list))
 
-    LabelSetText("DeathReplay_GUINavLabel", (d.zone or L"?") .. L"  -  killed by " .. kbName)
+    -- Kills mode: " *KB*" only on a confirmed finishing blow -- assists
+    -- deliberately get no marker. Missing career shows the name alone.
+    local navText
+    if state.currentMode == "kills" then
+        navText = d.victimName or L"?"
+        if d.career and d.career ~= L"" then
+            navText = navText .. L" (" .. d.career .. L")"
+        end
+        if d.isKillingBlow then
+            navText = navText .. L" *KB*"
+        end
+    else
+        local kbName = L"unknown"
+        if d.killingBlow then
+            kbName = abilityDisplayName(d.killingBlow.ability, d.killingBlow.abilityId)
+        end
+        navText = (d.zone or L"?") .. L"  -  killed by " .. kbName
+    end
+    LabelSetText("DeathReplay_GUINavLabel", navText)
     LabelSetTextColor("DeathReplay_GUINavLabel", 255, 255, 255)
 
     WindowSetShowing("DeathReplay_GUIEmptyHint", false)
@@ -456,16 +497,20 @@ function DeathReplay_GUI.Render()
         end
     end
 
-    populateTimeline(d)
+    local allowKB = (state.currentMode ~= "kills") or (d.isKillingBlow == true)
+    populateTimeline(d, allowKB)
     aggregateBySkill(d)
     sortOverview()
     ListBoxSetDisplayOrder("DeathReplay_GUIOverviewContentList", overviewDisplayOrder)
     applyTabVisibility()
 
-    -- Mark this death viewed.
+    -- Mark this record viewed. Kill records get the flag too (for possible
+    -- future use) but the skull indicator is deaths-only, so Recompute() is
+    -- called only in deaths mode — it never counts kills.
     if d.viewed == false then
         d.viewed = true
-        if DeathReplayIndicator and DeathReplayIndicator.Recompute then
+        if state.currentMode == "deaths"
+           and DeathReplayIndicator and DeathReplayIndicator.Recompute then
             DeathReplayIndicator.Recompute()
         end
     end
@@ -486,6 +531,15 @@ function DeathReplay_GUI.Show()
     ButtonSetText("DeathReplay_GUISortMax",       L"Max"    .. arrowForOverview("Max"))
     ButtonSetText("DeathReplay_GUITabsOverview", L"Overview")
     ButtonSetText("DeathReplay_GUITabsTimeline", L"Timeline")
+    ButtonSetText("DeathReplay_GUIModesDeaths", L"Deaths")
+    ButtonSetText("DeathReplay_GUIModesKills",  L"Kills")
+    -- Default to deaths mode on open. Only reset the index when coming back
+    -- from kills so deaths-mode reopen behavior is unchanged (preserves the
+    -- previously viewed death).
+    if state.currentMode ~= "deaths" then
+        state.currentMode  = "deaths"
+        state.currentIndex = 1
+    end
     DeathReplay_GUI.Render()
 end
 
@@ -555,6 +609,19 @@ function DeathReplay_GUI.OnTabClick()
                            .. L" prevTab=" .. towstring(state.currentTab))
     if id == 0 or id == state.currentTab then return end
     state.currentTab = id
+    DeathReplay_GUI.Render()
+end
+
+function DeathReplay_GUI.OnModeClick()
+    -- Deaths/Kills footer toggle: shares one handler, distinguished by the id
+    -- attribute (1 = Deaths, 2 = Kills). Toggling resets to the newest record
+    -- (index 1) — no per-mode index memory.
+    local name = SystemData.ActiveWindow.name
+    local id = WindowGetId(name)
+    local mode = (id == 2) and "kills" or "deaths"
+    if id == 0 or mode == state.currentMode then return end
+    state.currentMode  = mode
+    state.currentIndex = 1
     DeathReplay_GUI.Render()
 end
 
@@ -669,6 +736,7 @@ DeathReplay_GUI.OnRowPopulated  = dr_safe("OnRowPopulated",  DeathReplay_GUI.OnR
 DeathReplay_GUI.OnOverviewRowPopulated = dr_safe("OnOverviewRowPopulated", DeathReplay_GUI.OnOverviewRowPopulated)
 DeathReplay_GUI.OnOverviewSort  = dr_safe("OnOverviewSort",  DeathReplay_GUI.OnOverviewSort)
 DeathReplay_GUI.OnTabClick      = dr_safe("OnTabClick",      DeathReplay_GUI.OnTabClick)
+DeathReplay_GUI.OnModeClick     = dr_safe("OnModeClick",     DeathReplay_GUI.OnModeClick)
 DeathReplay_GUI.OnClose         = dr_safe("OnClose",         DeathReplay_GUI.OnClose)
 DeathReplay_GUI.OnRowMouseOver    = dr_safe("OnRowMouseOver",    DeathReplay_GUI.OnRowMouseOver)
 DeathReplay_GUI.OnRowMouseOverEnd = dr_safe("OnRowMouseOverEnd", DeathReplay_GUI.OnRowMouseOverEnd)

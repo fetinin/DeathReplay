@@ -1,3 +1,41 @@
+# DeathReplay v0.6.0
+
+Released 7/18/2026. Changes since v0.5.0.
+
+## New
+
+- **Kill Log — the death replay, mirrored for your victims.** The replay
+  window now has **Deaths / Kills** toggle buttons in the footer. Kills
+  mode shows every enemy that died while you had it targeted and had dealt
+  it damage, with the same Overview and Timeline tabs as deaths: your
+  per-victim damage timeline, ability icons, crits, and the killing blow.
+  The nav label reads `Name (Career)` with ` *KB*` appended when *you*
+  landed the finishing blow; assists carry no marker. Capture is fully
+  event-driven — no chat-text parsing, no polling timers.
+- **Killing-blow vs assist tagging.** Your `LifetimeDeathBlows` counter is
+  matched against captured deaths in a short window (either signal may
+  surface first), so confirmed killing blows are tagged reliably; the
+  count of `*KB*` records tracks your DeathBlows delta.
+- **Timeline hygiene.** A victim seen back at full HP wipes its buffered
+  damage (healed-away damage never pollutes a later kill), and a 30-second
+  gap in your damage starts a fresh timeline. A lethal hit whose combat
+  event arrives just after the death is folded into the captured kill,
+  same as the death log's trailing fold-in.
+- **Skull indicator is now always visible** and opens the window on click
+  (it previously appeared only while unviewed deaths existed).
+
+## Notes
+
+- **Targeted kills only.** Enemies killed without ever being your target
+  (pure AoE/cleave) are not captured — the client exposes no identity for
+  them. Deaths of your target that you did no damage to are deliberately
+  not logged.
+- `/dr reset` now clears both deaths and kills.
+- Kills are stored per character next to deaths (up to 20, FIFO); schema
+  stays v3, no migration required.
+
+---
+
 # DeathReplay v0.5.0
 
 Released 6/11/2026. Changes since v0.4.3.

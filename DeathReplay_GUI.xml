@@ -286,6 +286,44 @@
                         <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnNext"/>
                     </EventHandlers>
                 </Button>
+
+                <!-- Deaths/Kills mode toggle, centered in the footer between the
+                     Prev and Next arrows. Both buttons fire OnModeClick,
+                     distinguished by the id attribute (1 = Deaths, 2 = Kills).
+                     Deliberately a single anchor: two or more anchors stretch a
+                     window instead of positioning it. -->
+                <Window name="$parentModes">
+                    <Size><AbsPoint x="184" y="28" /></Size>
+                    <Anchors>
+                        <Anchor point="bottom" relativePoint="bottom" relativeTo="$parent">
+                            <AbsPoint x="0" y="-14" />
+                        </Anchor>
+                    </Anchors>
+                    <Windows>
+                        <Button name="$parentDeaths" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup" id="1">
+                            <Size><AbsPoint x="88" y="28" /></Size>
+                            <Anchors>
+                                <Anchor point="topleft" relativePoint="topleft" relativeTo="">
+                                    <AbsPoint x="0" y="0" />
+                                </Anchor>
+                            </Anchors>
+                            <EventHandlers>
+                                <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnModeClick"/>
+                            </EventHandlers>
+                        </Button>
+                        <Button name="$parentKills" inherits="EA_Button_ListSort" font="font_chat_text" textalign="center" layer="popup" id="2">
+                            <Size><AbsPoint x="88" y="28" /></Size>
+                            <Anchors>
+                                <Anchor point="topleft" relativePoint="topleft" relativeTo="">
+                                    <AbsPoint x="96" y="0" />
+                                </Anchor>
+                            </Anchors>
+                            <EventHandlers>
+                                <EventHandler event="OnLButtonUp" function="DeathReplay_GUI.OnModeClick"/>
+                            </EventHandlers>
+                        </Button>
+                    </Windows>
+                </Window>
             </Windows>
         </Window>
 
