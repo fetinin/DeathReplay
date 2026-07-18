@@ -1,4 +1,4 @@
--- DeathReplay v0.5.0 — skeleton, see docs/superpowers/specs/2026-05-15-death-replay-design.md
+-- DeathReplay v0.6.0 — skeleton, see docs/superpowers/specs/2026-05-15-death-replay-design.md
 
 DeathReplay = {}
 DeathReplay_SavedVariables = nil   -- engine populates from disk on load, or leaves nil on first run
@@ -1215,7 +1215,7 @@ function DeathReplay.OnInitialize()
         _origOnHyperLinkLButtonUp = EA_ChatWindow.OnHyperLinkLButtonUp
         EA_ChatWindow.OnHyperLinkLButtonUp = onHyperLinkLButtonUp
 
-        EA_ChatWindow.Print(L"DeathReplay v0.5.0 loaded.")
+        EA_ChatWindow.Print(L"DeathReplay v0.6.0 loaded.")
 
         if DeathReplayIndicator and DeathReplayIndicator.Recompute then
             DeathReplayIndicator.Recompute()
